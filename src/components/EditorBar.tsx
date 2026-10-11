@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { open, ask } from "@tauri-apps/plugin-dialog";
-import { Check, ChevronLeft, ChevronRight, Clapperboard, FileDown, Glasses, Pause, PenLine, Play, Square, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clapperboard, FileDown, AppWindow, Glasses, History, Pause, PenLine, Play, Square, X } from "lucide-react";
 import { useStore } from "../store";
 import type { TreeNode } from "../types";
 import { tNow, useT } from "../lib/i18n";
@@ -11,6 +11,9 @@ import { pauseReading, startReading, stopReading, ttsAvailable, useTts } from ".
 import { findAll } from "../lib/editorExtensions";
 import { locate } from "../lib/tree";
 import { newId } from "../lib/ids";
+import { VariantsBar } from "./Variants";
+import { comboFor } from "../lib/shortcuts";
+import { openPanel } from "../lib/panels";
 
 /** Barra de la Hoja: Lápiz rojo, Lupa, lectura en voz alta y modo guion. */
 export default function EditorBar({ editor, node }: { editor: Editor | null; node: TreeNode }) {
@@ -128,6 +131,13 @@ export default function EditorBar({ editor, node }: { editor: Editor | null; nod
       )}
       <button className="eb-btn" onClick={() => void importReview()} title={t("rev.importHint")}>
         <FileDown size={14} /> {t("rev.import")}
+      </button>
+      <VariantsBar node={node} />
+      <button className="eb-btn" onClick={() => useStore.setState({ timeMachine: node.id })} title={`${t("tm.title")} (${comboFor("timeMachine")})`}>
+        <History size={14} /> {t("tm.short")}
+      </button>
+      <button className="icon-btn" title={t("panel.open")} onClick={() => void openPanel("text", node.id, node.title)}>
+        <AppWindow size={14} />
       </button>
       <span className="spacer" />
       <button className={`eb-btn ${lens ? "on" : ""}`} onClick={() => useStore.getState().setSettings({ lens: !lens })} title={t("lens.hint")}>

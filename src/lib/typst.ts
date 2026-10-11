@@ -39,6 +39,7 @@ function runs(rs: Run[]): string {
 function body(md: string, sep: string, leadIn: { smallCaps: boolean; bigInitial: boolean } | null): string {
   const out: string[] = [];
   let first = leadIn;
+  let afterDrop = false;
   for (const b of markdownBlocks(md)) {
     if (b.type === "hr") {
       out.push(sep);
@@ -49,8 +50,12 @@ function body(md: string, sep: string, leadIn: { smallCaps: boolean; bigInitial:
       continue;
     }
     let content = runs(b.runs);
+    if (afterDrop && b.type === "p") content = `#h(1.3em)${content}`;
+    afterDrop = false;
     if (first && b.type === "p" && b.runs.length && !b.runs[0].br) {
       content = leadInText(b.runs, first);
+      // La capitular es un bloque: el párrafo siguiente no recibiría sangría por sí solo.
+      afterDrop = content.startsWith("#dropcap(");
       first = null;
     }
     if (b.type === "quote") out.push(`#pad(x: 2em)[#emph[${content}]]`);
@@ -60,7 +65,76 @@ function body(md: string, sep: string, leadIn: { smallCaps: boolean; bigInitial:
   return out.join("\n\n");
 }
 
+/** Una palabra en marcado Typst con su formato, para poder partir el párrafo por palabras. */
+function wordMarkup(text: string, r: Run, caps: boolean): string {
+  let t = esc(text);
+  if (caps) t = `#smallcaps[${t}]`;
+  if (r.strike) t = `#strike[${t}]`;
+  if (r.italics) t = `#emph[${t}]`;
+  if (r.bold) t = `#strong[${t}]`;
+  return t;
+}
+
+/**
+ * Inicial capitular de verdad: la letra ocupa tres líneas y el texto la rodea.
+ * Devuelve null si el párrafo no se presta (empieza con raya o comillas, o
+ * tiene saltos de línea): entonces se usa la inicial grande de siempre.
+ */
+export function dropCapText(rs: Run[], smallCaps: boolean): string | null {
+  if (rs.some((r) => r.br)) return null;
+  const m = /^(\p{L})/u.exec(rs[0]?.text ?? "");
+  if (!m) return null;
+  const words: string[] = [];
+  let pending = "";
+  let capsLeft = smallCaps ? 4 : 0;
+  rs.forEach((r, ri) => {
+    const text = ri === 0 ? r.text.slice(m[0].length) : r.text;
+    // Se respetan los espacios: una palabra puede repartirse entre dos trozos con distinto formato.
+    const pieces = text.split(/(\s+)/);
+    for (const piece of pieces) {
+      if (!piece) continue;
+      if (/^\s+$/.test(piece)) {
+        if (pending) words.push(pending);
+        pending = "";
+        continue;
+      }
+      let caps = capsLeft > 0;
+      if (caps && /[,;:.!?]/.test(piece)) capsLeft = 0;
+      pending += wordMarkup(piece, r, caps);
+      if (caps) capsLeft--;
+      caps = false;
+    }
+  });
+  if (pending) words.push(pending);
+  return `#dropcap(${str(m[1])}, (${words.map(str).join(", ")}))`;
+}
+
+/** Función de Typst para la inicial capitular (se añade a la cabecera del libro). */
+export const DROPCAP_FN = `#let dropcap(letter, words, lines: 3, gap: 0.35em) = layout(size => context {
+  let n-lines = range(lines).map(_ => [X]).join(linebreak())
+  let span = measure(block(width: size.width, par(first-line-indent: 0pt, n-lines))).height
+  let one = measure([X]).height
+  let cap = box(text(size: (span / one) * 1em, letter))
+  let capw = measure(cap).width + gap
+  let w = size.width - capw
+  let fits(k) = measure(block(width: w, par(justify: true, first-line-indent: 0pt, eval(words.slice(0, k).join(" "), mode: "markup")))).height <= span + 0.1pt
+  let lo = 0
+  let hi = words.len()
+  while lo < hi {
+    let mid = calc.ceil((lo + hi) / 2)
+    if fits(mid) { lo = mid } else { hi = mid - 1 }
+  }
+  let head = eval(words.slice(0, lo).join(" "), mode: "markup")
+  let tail = words.slice(lo)
+  block(below: par.leading, grid(columns: (capw, 1fr), cap, par(justify: true, first-line-indent: 0pt, if tail.len() > 0 { head + linebreak(justify: true) } else { head })))
+  if tail.len() > 0 { par(first-line-indent: 0pt, eval(tail.join(" "), mode: "markup")) }
+})`;
+
 function leadInText(rs: Run[], o: { smallCaps: boolean; bigInitial: boolean }): string {
+  if (o.bigInitial) {
+    const real = dropCapText(rs, o.smallCaps);
+    if (real) return real;
+  }
   const firstRun = rs[0];
   const text = firstRun.text;
   const m = /^(\s*[«“"¿¡—–-]*)(\p{L})/u.exec(text);
@@ -126,6 +200,7 @@ export function bookTypst(m: Manifest, pieces: Piece[], lang: string, labels: Bo
   align(center)[#text(size: 2em, tracking: 0.06em)[#smallcaps(it.body)]]
 }`);
   head.push(`#show heading.where(level: 3): it => align(center, block(above: 1.4em, below: 1em)[#emph(it.body)])`);
+  if (p.dropCaps) head.push(DROPCAP_FN);
 
   const front: string[] = [`#set page(header: none, footer: none)`];
   if (p.halfTitle) front.push(`#v(28%)\n#align(center)[#text(size: 1.4em)[${esc(m.title)}]]\n#pagebreak()\n#pagebreak()`);
@@ -226,6 +301,41 @@ export function manuscriptTypst(m: Manifest, pieces: Piece[], s: Settings, opts:
     first = false;
   }
   out.push(`#v(1em)\n#align(center)[${esc(end)}]`);
+  return out.join("\n\n") + "\n";
+}
+
+export interface ProofLabels {
+  scene: string;
+  page: string;
+  notes: string;
+}
+
+/**
+ * Copia para leer en papel: A4 a doble espacio, margen derecho ancho para
+ * anotar, líneas numeradas por página y cada escena con su número y título.
+ */
+export function proofTypst(m: Manifest, pieces: Piece[], titles: Record<string, string>, lang: string, labels: ProofLabels): string {
+  const out: string[] = [
+    `#set document(title: ${str(m.title)}, author: ${str(m.author || " ")})`,
+    `#set page(paper: "a4", margin: (left: 2.4cm, right: 6cm, top: 2.4cm, bottom: 2.4cm), header: context { set text(size: 8pt, fill: luma(110)); grid(columns: (1fr, auto), ${str(m.title)}, [${esc(labels.page)} #counter(page).display() / #counter(page).final().first()]) }, footer: context { set text(size: 7.5pt, fill: luma(150)); align(right, ${str(labels.notes)}) })`,
+    `#set text(font: ("Literata", "Libertinus Serif"), size: 12pt, lang: ${str(lang)}, hyphenate: false)`,
+    `#set par(justify: false, leading: 1.45em, spacing: 1.45em, first-line-indent: 1.2em)`,
+    `#set par.line(numbering: n => text(size: 7pt, fill: luma(150))[#n], numbering-scope: "page")`,
+    `#show heading: it => { pagebreak(weak: true); v(1.5em); text(size: 16pt, weight: "bold", it.body); v(1em) }`,
+    `#align(center)[#v(30%) #text(size: 22pt)[${esc(m.title)}] \\ #v(0.6em) ${esc(m.author)}]`,
+    `#pagebreak()`,
+  ];
+  let scene = 0;
+  for (const x of pieces) {
+    if (x.kind === "heading") out.push(`${"=".repeat(Math.min(3, x.level))} ${esc(x.text)}`);
+    else if (x.kind === "break") out.push(`#align(center)[\\*]`);
+    else {
+      scene++;
+      const title = x.id ? titles[x.id] ?? "" : "";
+      out.push(`#block(above: 1.6em, below: 0.8em, sticky: true)[#text(size: 8pt, tracking: 0.08em, fill: luma(90))[#smallcaps[${esc(labels.scene)} ${scene}]${title ? ` · ${esc(title)}` : ""}]]`);
+      out.push(body(x.md, `#align(center)[\\*]`, null));
+    }
+  }
   return out.join("\n\n") + "\n";
 }
 

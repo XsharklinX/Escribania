@@ -2,6 +2,8 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { pushRecent, useStore } from "../store";
 import type { Manifest, TreeNode } from "../types";
+import { pullSaga } from "./saga";
+import { startSync, stopSync } from "./sync";
 import { api, errorText } from "./api";
 import { tNow } from "./i18n";
 import { backupNow, flushAll, startBackups, stopBackups } from "./saver";
@@ -72,6 +74,8 @@ export async function openProject(path: string): Promise<boolean> {
     refreshMentions(300);
     void backupNow(true);
     startBackups();
+    void pullSaga();
+    void startSync();
     return true;
   } catch (e) {
     st.toast(`${tNow("toast.openError")}: ${errorText(e)}`, "error");
@@ -81,6 +85,7 @@ export async function openProject(path: string): Promise<boolean> {
 
 export async function closeProject() {
   await flushAll();
+  stopSync();
   await stopJournal();
   await backupNow();
   stopBackups();

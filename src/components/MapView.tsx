@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { ImagePlus, MapPin, MousePointer2, Route, Trash2, X } from "lucide-react";
+import { AppWindow, ImagePlus, MapPin, MousePointer2, Route, Trash2, X } from "lucide-react";
 import { useStore } from "../store";
+import { openPanel } from "../lib/panels";
 import type { MapDef, MapPin as Pin } from "../types";
 import { tNow, useT } from "../lib/i18n";
 import { importFiles, IMAGE_EXT, useAsset } from "../lib/assets";
@@ -110,6 +111,9 @@ export default function MapView() {
   return (
     <div className="view map-view">
       <div className="view-head">
+        <button className="icon-btn" title={t("panel.open")} onClick={() => void openPanel("map", mapId ?? "", t("view.mapa"))}>
+          <AppWindow size={16} />
+        </button>
         <div className="board-tabs">
           {m.maps.map((x) => (
             <button key={x.id} className={x.id === mapId ? "on" : ""} onClick={() => setMapId(x.id)}>

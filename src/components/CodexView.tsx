@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { Columns2, ImagePlus, Plus, Trash2, X } from "lucide-react";
+import { AppWindow, Columns2, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { useStore } from "../store";
+import { openPanel } from "../lib/panels";
 import type { CodexEntry, CodexKind } from "../types";
 import { tNow, useT } from "../lib/i18n";
 import { api } from "../lib/api";
@@ -172,7 +173,16 @@ export function EntryDetail({ id, compact }: { id: string; compact?: boolean }) 
               <input type="checkbox" checked={e.mentions} onChange={(ev) => set({ mentions: ev.target.checked })} />
               {t("codex.mentions")}
             </label>
+            {m.saga && (
+              <label className="check" title={t("saga.sharedHint")}>
+                <input type="checkbox" checked={Boolean(e.shared)} onChange={(ev) => set({ shared: ev.target.checked || undefined })} />
+                {t("saga.shared")}
+              </label>
+            )}
             <span className="spacer" />
+            <button className="icon-btn" title={t("panel.open")} onClick={() => void openPanel("codex", id, e.name)}>
+              <AppWindow size={16} />
+            </button>
             {!compact && (
               <button className="icon-btn" title={t("split.open")} onClick={() => useStore.setState({ split: { kind: "codex", id }, view: "hoja" })}>
                 <Columns2 size={16} />

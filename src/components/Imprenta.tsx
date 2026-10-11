@@ -8,13 +8,16 @@ import { tNow, useT, type TKey } from "../lib/i18n";
 import { api, errorText } from "../lib/api";
 import { collectPieces, type Piece } from "../lib/compile";
 import { flushAll } from "../lib/saver";
-import { bookTypst, coverTypst, manuscriptTypst, screenplayTypst } from "../lib/typst";
+import { bookTypst, coverTypst, manuscriptTypst, proofTypst, screenplayTypst } from "../lib/typst";
+import { walk } from "../lib/tree";
 import { epubChapters, epubCss } from "../lib/epub";
 import { kitDocx, manuscriptDocx } from "../lib/docxExtra";
 import { markdownToPlain } from "../lib/markdown";
 import { spineWidth, TRIMS } from "../lib/model";
 import { importFiles, IMAGE_EXT, useAsset } from "../lib/assets";
 import { slugify, newId } from "../lib/ids";
+import Spreads from "./Spreads";
+import PressStyles from "./PressStyles";
 import { countWords, formatNumber } from "../lib/words";
 
 type Tab = "book" | "manuscript" | "cover" | "kit" | "subs";
@@ -89,6 +92,7 @@ function useFonts() {
 
 function Preview({ url, busy, pages, error, onCompose }: { url: string | null; busy: boolean; pages: number | null; error: string; onCompose: () => void }) {
   const t = useT();
+  const [mode, setMode] = useState<"spreads" | "pdf">("spreads");
   return (
     <div className="press-preview">
       <div className="press-bar">
@@ -96,9 +100,18 @@ function Preview({ url, busy, pages, error, onCompose }: { url: string | null; b
           <RefreshCw size={15} className={busy ? "spin" : ""} /> {busy ? t("pub.composing") : t("pub.preview")}
         </button>
         {pages !== null && <span className="muted">{t("pub.pages", { n: pages })}</span>}
+        <span className="spacer" />
+        <div className="seg small">
+          <button className={mode === "spreads" ? "on" : ""} onClick={() => setMode("spreads")}>
+            {t("sp.spreads")}
+          </button>
+          <button className={mode === "pdf" ? "on" : ""} onClick={() => setMode("pdf")}>
+            PDF
+          </button>
+        </div>
       </div>
       {error && <p className="error-text pad">{error}</p>}
-      {url ? <iframe title="PDF" src={url} /> : <div className="editor-empty">{t("pub.previewHint")}</div>}
+      {url ? mode === "pdf" || !pages ? <iframe title="PDF" src={url} /> : <Spreads pages={pages} version={url} /> : <div className="editor-empty">{t("pub.previewHint")}</div>}
     </div>
   );
 }
@@ -230,6 +243,8 @@ function BookTab() {
           </label>
         </section>
 
+        <PressStyles />
+
         <section>
           <h3>{t("pub.front")}</h3>
           <div className="grid2">
@@ -324,15 +339,19 @@ function ManuscriptTab() {
   const hasScript = JSON.stringify(m.sections.manuscript).includes('"screenplay":true');
   const l = { by: t("ms.by"), words: t("ms.words"), end: t("ms.end") };
 
-  const run = async (kind: "ms" | "script", out: string | null) => {
+  const run = async (kind: "ms" | "script" | "proof", out: string | null) => {
     setBusy(true);
     setError("");
     try {
       const ps = await pieces();
+      const titles: Record<string, string> = {};
+      walk(m.sections.manuscript, (n) => void (titles[n.id] = n.title));
       const source =
         kind === "ms"
           ? manuscriptTypst(m, ps, settings, { paper, font }, settings.lang, l.end, l.by, l.words)
-          : screenplayTypst(m, scriptParagraphs(ps), l.by);
+          : kind === "proof"
+            ? proofTypst(m, ps, titles, settings.lang, { scene: t("proof.scene"), page: t("proof.page"), notes: t("proof.notes") })
+            : screenplayTypst(m, scriptParagraphs(ps), l.by);
       const info = await api.typeset(root, source, {}, out);
       setPages(info.pages);
       if (out) done(out);
@@ -413,6 +432,25 @@ function ManuscriptTab() {
             <FileText size={15} /> Word (.docx)
           </button>
         </div>
+        <section>
+          <h3>{t("proof.title")}</h3>
+          <p className="muted">{t("proof.hint")}</p>
+          <div className="press-actions">
+            <button className="btn" disabled={busy} onClick={() => void run("proof", null)}>
+              {t("pub.preview")}
+            </button>
+            <button
+              className="btn"
+              disabled={busy}
+              onClick={async () => {
+                const path = await saveAs(m.title + " " + t("proof.file"), "pdf");
+                if (path) await run("proof", path);
+              }}
+            >
+              <Download size={15} /> PDF
+            </button>
+          </div>
+        </section>
         {hasScript && (
           <section>
             <h3>{t("ms.script")}</h3>

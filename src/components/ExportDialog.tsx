@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { chapterPage, indexPage, webChapters } from "../lib/web";
+import { betaHtml } from "../lib/beta";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useStore } from "../store";
 import type { CompileOptions } from "../types";
@@ -15,8 +17,8 @@ import { reviewDocx } from "../lib/docxExtra";
 import { walk } from "../lib/tree";
 import type { Comment } from "../types";
 
-type Format = "docx" | "review" | "md" | "html" | "txt";
-const FORMATS: Format[] = ["docx", "review", "md", "html", "txt"];
+type Format = "docx" | "review" | "md" | "html" | "txt" | "web" | "beta";
+const FORMATS: Format[] = ["docx", "review", "md", "html", "txt", "web", "beta"];
 
 export default function ExportDialog() {
   const t = useT();
@@ -31,6 +33,7 @@ export default function ExportDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [count, setCount] = useState<number | null>(null);
+  const [webExt, setWebExt] = useState<"html" | "md">("html");
   const close = () => useStore.setState({ dialog: null });
   const setOpt = (patch: Partial<CompileOptions>) => edit((mm) => void Object.assign(mm.compile, patch));
 
@@ -46,6 +49,33 @@ export default function ExportDialog() {
       const { pieces, texts } = await collectPieces(m, opts, (f) => api.textRead(project.root, f), t("exp.glossaryTitle"), format === "review");
       if (!texts) {
         setError(t("exp.empty"));
+        return;
+      }
+      if (format === "web") {
+        const dir = await open({ directory: true, multiple: false, title: t("exp.webDir") });
+        if (typeof dir !== "string") return;
+        const sep = dir.includes("\\") ? "\\" : "/";
+        const chapters = webChapters(m, pieces, opts.separator);
+        for (let i = 0; i < chapters.length; i++) {
+          const c = chapters[i];
+          const text = webExt === "md" ? c.md : chapterPage(m, c, lang, { prev: chapters[i - 1], next: chapters[i + 1], index: t("exp.webIndex") });
+          await api.fileWriteText(`${dir}${sep}${c.file}.${webExt}`, text);
+        }
+        await api.fileWriteText(`${dir}${sep}index.${webExt}`, indexPage(m, chapters, lang, webExt));
+        toast(t("exp.webDone", { n: chapters.length }));
+        void revealItemInDir(`${dir}${sep}index.${webExt}`).catch(() => {});
+        close();
+        return;
+      }
+      if (format === "beta") {
+        const path = await save({ defaultPath: `${slugify(m.title) || "libro"}-lectores.html`, filters: [{ name: "HTML", extensions: ["html"] }] });
+        if (!path) return;
+        const keys = ["intro", "name", "namePh", "comment", "save", "cancel", "download", "notes", "empty", "remove", "placeholder", "saved"] as const;
+        const labels = Object.fromEntries(keys.map((k) => [k, t(`beta.${k}`)])) as Record<(typeof keys)[number], string>;
+        await api.fileWriteText(path, betaHtml(m, pieces, lang, labels));
+        toast(`${t("exp.done")}: ${path}`);
+        void revealItemInDir(path).catch(() => {});
+        close();
         return;
       }
       const path = await save({
@@ -125,6 +155,21 @@ export default function ExportDialog() {
           <span>{t("exp.separator")}</span>
           <input id="exp-sep" className="input" value={opts.separator} onChange={(e) => setOpt({ separator: e.target.value })} style={{ maxWidth: 200 }} />
         </label>
+        {format === "web" && (
+          <div className="field">
+            <span>{t("exp.webFormat")}</span>
+            <div className="seg">
+              <button className={webExt === "html" ? "on" : ""} onClick={() => setWebExt("html")}>
+                HTML
+              </button>
+              <button className={webExt === "md" ? "on" : ""} onClick={() => setWebExt("md")}>
+                Markdown
+              </button>
+            </div>
+            <small className="muted">{t("exp.webHint")}</small>
+          </div>
+        )}
+        {format === "beta" && <p className="muted">{t("exp.betaHint")}</p>}
         {format === "docx" && (
           <>
             <label className="check">

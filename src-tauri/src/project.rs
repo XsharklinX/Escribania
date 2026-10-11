@@ -256,6 +256,21 @@ pub fn file_write_text(path: String, text: String) -> Result<(), String> {
     fsx::write_atomic(Path::new(&path), text.as_bytes())
 }
 
+/// Importaciones pequeñas que elige el usuario (estilos, temas, extensiones, notas de lectores).
+#[tauri::command]
+pub fn file_read_text(path: String) -> Result<String, String> {
+    let p = Path::new(&path);
+    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if !["json", "js", "txt", "md", "css"].contains(&ext.as_str()) {
+        return Err("Ese tipo de archivo no se puede importar aquí.".into());
+    }
+    let meta = std::fs::metadata(p).map_err(|e| format!("No se puede leer {path}: {e}"))?;
+    if meta.len() > 4 * 1024 * 1024 {
+        return Err("El archivo es demasiado grande.".into());
+    }
+    std::fs::read_to_string(p).map_err(|e| format!("No se puede leer {path}: {e}"))
+}
+
 #[tauri::command]
 pub fn file_write_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
     fsx::write_atomic(Path::new(&path), &bytes)

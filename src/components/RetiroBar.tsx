@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { CloudRain, Flame, Waves, X } from "lucide-react";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { CloudRain, Flame, Keyboard, Library, ShieldOff, TrainFront, Trees, Waves, X } from "lucide-react";
 import { useStore } from "../store";
-import { useT } from "../lib/i18n";
+import { tNow, useT } from "../lib/i18n";
 import { isPlaying, setAmbientVolume, toggleAmbient, type Ambient } from "../lib/ambient";
 import { bookWords } from "../lib/tree";
 import { formatNumber } from "../lib/words";
@@ -14,6 +15,7 @@ export default function RetiroBar() {
   const setSettings = useStore((s) => s.setSettings);
   const session = useStore((s) => bookWords(s.project!.manifest, s.words) - s.sessionStart);
   const lang = useStore((s) => s.settings.lang);
+  const noNet = useStore((s) => s.noNet);
   const [visible, setVisible] = useState(true);
   const [, force] = useState(0);
 
@@ -39,13 +41,15 @@ export default function RetiroBar() {
   const sound = (kind: Ambient, Icon: typeof CloudRain, label: string) => (
     <button
       className={isPlaying(kind) ? "on" : ""}
+      title={label}
+      aria-label={label}
       onClick={() => {
         toggleAmbient(kind);
         setAmbientVolume(volume);
         force((n) => n + 1);
       }}
     >
-      <Icon size={14} /> {label}
+      <Icon size={15} />
     </button>
   );
 
@@ -54,6 +58,10 @@ export default function RetiroBar() {
       {sound("rain", CloudRain, t("retiro.rain"))}
       {sound("fire", Flame, t("retiro.fire"))}
       {sound("sea", Waves, t("retiro.sea"))}
+      {sound("train", TrainFront, t("retiro.train"))}
+      {sound("forest", Trees, t("retiro.forest"))}
+      {sound("library", Library, t("retiro.library"))}
+      {sound("keys", Keyboard, t("retiro.keys"))}
       <input
         id="retiro-volume"
         type="range"
@@ -64,6 +72,16 @@ export default function RetiroBar() {
         aria-label={t("retiro.volume")}
         onChange={(e) => setSettings({ ambientVolume: Number(e.target.value) })}
       />
+      <button
+        className={noNet ? "on danger" : ""}
+        title={t("nonet.hint")}
+        onClick={async () => {
+          if (!noNet && !(await ask(tNow("nonet.ask"), { kind: "warning", title: tNow("nonet.title") }))) return;
+          useStore.setState({ noNet: !noNet });
+        }}
+      >
+        <ShieldOff size={14} /> {t("nonet.title")}
+      </button>
       <span className="count">
         {session >= 0 ? "+" : "−"}
         {formatNumber(Math.abs(session), lang)} {t("ed.words")}

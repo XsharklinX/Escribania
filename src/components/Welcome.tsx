@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir, join } from "@tauri-apps/api/path";
-import { FilePlus2, FolderOpen, Import, Lightbulb, Usb, X } from "lucide-react";
+import { FilePlus2, FolderOpen, Import, BookOpenText, Compass, Lightbulb, Usb, X } from "lucide-react";
 import logo from "../assets/logo.png";
+import { openSample } from "../lib/sample";
 import { useStore } from "../store";
 import { useT, type TKey } from "../lib/i18n";
 import { api, errorText } from "../lib/api";
@@ -49,6 +50,17 @@ export default function Welcome() {
           </button>
           <button className="btn big" onClick={() => useStore.setState({ dialog: "capture" })}>
             <Lightbulb size={18} /> {t("nb.title")}
+          </button>
+          <button className="btn big" onClick={() => void openSample()}>
+            <BookOpenText size={18} /> {t("welcome.sample")}
+          </button>
+          <button
+            className="btn ghost"
+            onClick={async () => {
+              if (await openSample()) useStore.setState({ tour: 0 });
+            }}
+          >
+            <Compass size={16} /> {t("welcome.tour")}
           </button>
         </div>
         <div className="welcome-foot">

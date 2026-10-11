@@ -57,6 +57,8 @@ pub struct AppInfo {
     pub backups_dir: String,
     /// Proyecto pasado al abrir (doble clic en un `.escribania`).
     pub startup_file: Option<String>,
+    /// Opciones de arranque que pasa el instalador (`--ejemplo`, `--recorrido`).
+    pub flags: Vec<String>,
 }
 
 #[tauri::command]
@@ -70,6 +72,7 @@ pub fn app_info(app: tauri::AppHandle) -> Result<AppInfo, String> {
         data_dir: data_dir(&app)?.display().to_string(),
         backups_dir: backups_dir(&app)?.display().to_string(),
         startup_file,
+        flags: std::env::args().skip(1).filter(|a| a == "--ejemplo" || a == "--recorrido").collect(),
     })
 }
 

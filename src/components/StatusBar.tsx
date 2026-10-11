@@ -4,6 +4,10 @@ import { useT } from "../lib/i18n";
 import { bookWords, locate, wordsOf } from "../lib/tree";
 import { formatNumber } from "../lib/words";
 import { pace, useJournal } from "../lib/journal";
+import { useUpdate } from "../lib/updater";
+import { useSync } from "../lib/sync";
+import { CloudConflicts } from "./SyncDialogs";
+import { useState } from "react";
 
 export default function StatusBar() {
   const t = useT();
@@ -20,6 +24,10 @@ export default function StatusBar() {
   const f = (n: number) => formatNumber(n, lang);
   const journal = useJournal((s) => s.journal);
   const p = pace(m, book, journal);
+  const up = useUpdate((s) => (s.phase === "ready" || s.phase === "available" ? s.release?.version : null));
+  const upReady = useUpdate((s) => s.phase === "ready");
+  const cloud = useSync((s) => s.conflicts.length);
+  const [showCloud, setShowCloud] = useState(false);
 
   return (
     <div className="statusbar">
@@ -51,6 +59,17 @@ export default function StatusBar() {
           <Usb size={12} /> {t("app.portable")}
         </span>
       )}
+      {up && (
+        <button className="sb-link sb-update" onClick={() => useUpdate.setState({ dialog: "offer" })}>
+          {t(upReady ? "up.chip" : "up.chipAvail", { v: up })}
+        </button>
+      )}
+      {cloud > 0 && (
+        <button className="sb-link sb-warn" onClick={() => setShowCloud(true)}>
+          {t("sync.chip", { n: cloud })}
+        </button>
+      )}
+      {showCloud && <CloudConflicts onClose={() => setShowCloud(false)} />}
       <span className={`save ${save}`}>
         <i />
         {t(save === "saved" ? "sb.saved" : save === "saving" ? "sb.saving" : save === "pending" ? "sb.pending" : "sb.error")}

@@ -35,6 +35,14 @@ export const DEFAULT_SETTINGS: Settings = {
   ttsVoice: "",
   ttsRate: 1,
   contact: { legalName: "", address: "", email: "", phone: "" },
+  updates: "stable",
+  updateChecked: "",
+  updateNotes: null,
+  dyslexia: false,
+  contrast: false,
+  uiScale: 1,
+  reduceMotion: false,
+  keys: {},
 };
 
 export type SaveState = "saved" | "pending" | "saving" | "error";
@@ -84,6 +92,14 @@ interface State {
   sessionStart: number;
   saveState: SaveState;
   retiro: boolean;
+  /** Escritura sin red (solo en Retiro, se apaga al salir). */
+  noNet: boolean;
+  /** Máquina del tiempo abierta sobre este texto. */
+  timeMachine: string | null;
+  /** Colección elegida en el Legajo (lista plana en lugar del árbol). */
+  collection: string | null;
+  /** Recorrido guiado: paso actual (null = cerrado). */
+  tour: number | null;
   dialog: null | "settings" | "export" | "capture" | "sprint" | "import";
   toasts: Toast[];
 
@@ -126,6 +142,10 @@ export const useStore = create<State>((set, get) => ({
   sessionStart: 0,
   saveState: "saved",
   retiro: false,
+  noNet: false,
+  timeMachine: null,
+  collection: null,
+  tour: null,
   dialog: null,
   toasts: [],
   view: "hoja",

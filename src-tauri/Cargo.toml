@@ -1,6 +1,6 @@
 [package]
 name = "escribania"
-version = "0.7.0"
+version = "0.8.0"
 description = "Escribanía - software libre para escritores"
 authors = ["David Bonilla"]
 license = "GPL-3.0-or-later"
@@ -30,10 +30,18 @@ typst-pdf = "0.15.1"
 typst-layout = "0.15.1"
 typst-assets = { version = "0.15.1", features = ["fonts"] }
 quick-xml = "0.42"
+# Vista de pliegos de la Imprenta: páginas como imagen.
+typst-render = "0.15.1"
+# Actualizador: comprobar la firma ed25519 y la huella de cada descarga.
+ed25519-dalek = "2"
+sha2 = "0.10"
+
+[target."cfg(windows)".dependencies]
+# Actualizar la versión que muestra "Aplicaciones instaladas".
+winreg = "0.56.0"
 
 [dev-dependencies]
 tempfile = "3"
-typst-render = "0.15.1"
 
 [profile.release]
 codegen-units = 1

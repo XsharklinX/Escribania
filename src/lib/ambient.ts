@@ -1,8 +1,10 @@
 /**
  * Sonido ambiente de Retiro, generado en el momento con Web Audio.
- * No hay archivos de audio: lluvia, chimenea y mar salen de ruido filtrado.
+ * No hay archivos de audio: lluvia, chimenea, mar, tren, bosque y biblioteca
+ * salen de ruido filtrado y osciladores; las teclas suenan al escribir.
  */
-export type Ambient = "rain" | "fire" | "sea";
+export type Ambient = "rain" | "fire" | "sea" | "train" | "forest" | "library" | "keys";
+export const AMBIENTS: Ambient[] = ["rain", "fire", "sea", "train", "forest", "library", "keys"];
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -118,6 +120,158 @@ function startFire(c: AudioContext, out: AudioNode) {
   };
 }
 
+/** Un golpe corto de ruido filtrado (traqueteo, página, tecla). */
+function burst(c: AudioContext, out: AudioNode, opts: { dur: number; freq: number; q?: number; gain: number; type?: BiquadFilterType; decay?: number; at?: number }) {
+  const len = Math.max(1, Math.floor(c.sampleRate * opts.dur));
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const d = buf.getChannelData(0);
+  const k = opts.decay ?? 3;
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, k);
+  const s = c.createBufferSource();
+  s.buffer = buf;
+  const f = c.createBiquadFilter();
+  f.type = opts.type ?? "bandpass";
+  f.frequency.value = opts.freq;
+  f.Q.value = opts.q ?? 1;
+  const g = c.createGain();
+  g.gain.value = opts.gain;
+  s.connect(f).connect(g).connect(out);
+  s.start(opts.at ?? c.currentTime);
+}
+
+/** Tren nocturno: rumor grave y el «ta-tán» de las juntas de la vía. */
+function startTrain(c: AudioContext, out: AudioNode) {
+  const src = loop(c, "brown");
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 260;
+  const g = c.createGain();
+  g.gain.value = 0.55;
+  const sway = c.createOscillator();
+  sway.frequency.value = 0.07;
+  const depth = c.createGain();
+  depth.gain.value = 0.12;
+  sway.connect(depth).connect(g.gain);
+  src.connect(lp).connect(g).connect(out);
+  src.start();
+  sway.start();
+  const timer = setInterval(() => {
+    const t0 = c.currentTime + 0.02;
+    for (const [dt, gain] of [[0, 0.5], [0.16, 0.42], [0.95, 0.5], [1.11, 0.42]] as const) burst(c, out, { dur: 0.09, freq: 140, q: 0.8, gain, type: "lowpass", decay: 2, at: t0 + dt });
+  }, 2200);
+  return {
+    stop: () => {
+      clearInterval(timer);
+      src.stop();
+      sway.stop();
+    },
+  };
+}
+
+/** Bosque: viento entre las hojas y algún pájaro de vez en cuando. */
+function startForest(c: AudioContext, out: AudioNode) {
+  const src = loop(c, "white");
+  const bp = c.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 700;
+  bp.Q.value = 0.6;
+  const g = c.createGain();
+  g.gain.value = 0.12;
+  const wind = c.createOscillator();
+  wind.frequency.value = 0.09;
+  const wd = c.createGain();
+  wd.gain.value = 320;
+  wind.connect(wd).connect(bp.frequency);
+  src.connect(bp).connect(g).connect(out);
+  src.start();
+  wind.start();
+  let alive = true;
+  const bird = () => {
+    if (!alive) return;
+    const notes = 2 + Math.floor(Math.random() * 4);
+    const base = 2200 + Math.random() * 1800;
+    let t0 = c.currentTime + 0.05;
+    for (let i = 0; i < notes; i++) {
+      const o = c.createOscillator();
+      o.type = "sine";
+      const eg = c.createGain();
+      o.frequency.setValueAtTime(base, t0);
+      o.frequency.exponentialRampToValueAtTime(base * (1.2 + Math.random() * 0.5), t0 + 0.08);
+      eg.gain.setValueAtTime(0, t0);
+      eg.gain.linearRampToValueAtTime(0.06, t0 + 0.015);
+      eg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+      o.connect(eg).connect(out);
+      o.start(t0);
+      o.stop(t0 + 0.14);
+      t0 += 0.13 + Math.random() * 0.08;
+    }
+    setTimeout(bird, 3000 + Math.random() * 9000);
+  };
+  setTimeout(bird, 1500);
+  return {
+    stop: () => {
+      alive = false;
+      src.stop();
+      wind.stop();
+    },
+  };
+}
+
+/** Biblioteca: silencio de sala, un reloj lejano y alguna página que se pasa. */
+function startLibrary(c: AudioContext, out: AudioNode) {
+  const src = loop(c, "brown");
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 180;
+  const g = c.createGain();
+  g.gain.value = 0.25;
+  src.connect(lp).connect(g).connect(out);
+  src.start();
+  const tick = setInterval(() => burst(c, out, { dur: 0.012, freq: 3200, q: 6, gain: 0.05 }), 1000);
+  let alive = true;
+  const page = () => {
+    if (!alive) return;
+    burst(c, out, { dur: 0.35, freq: 2400, q: 0.7, gain: 0.07, type: "highpass", decay: 1.2 });
+    setTimeout(page, 7000 + Math.random() * 16000);
+  };
+  setTimeout(page, 4000);
+  return {
+    stop: () => {
+      alive = false;
+      clearInterval(tick);
+      src.stop();
+    },
+  };
+}
+
+/** Teclas de máquina de escribir: no suenan solas, sino con cada pulsación. */
+function startKeys() {
+  return { stop: () => {} };
+}
+
+/** Lo llama el editor en cada tecla mientras están activas las teclas. */
+export function keySound(key: string) {
+  if (!playing.has("keys") || !ctx || !master) return;
+  const c = ctx;
+  if (key === "Enter") {
+    // Retorno del carro y campanilla.
+    burst(c, master, { dur: 0.18, freq: 900, q: 0.8, gain: 0.25, decay: 1.5 });
+    const o = c.createOscillator();
+    const eg = c.createGain();
+    o.frequency.value = 2650;
+    eg.gain.setValueAtTime(0.12, c.currentTime + 0.12);
+    eg.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 1.1);
+    o.connect(eg).connect(master);
+    o.start(c.currentTime + 0.12);
+    o.stop(c.currentTime + 1.2);
+    return;
+  }
+  if (key.length > 1 && key !== "Backspace") return;
+  const space = key === " ";
+  burst(c, master, { dur: 0.025, freq: space ? 900 : 2200 + Math.random() * 1200, q: 1.5, gain: space ? 0.35 : 0.3 });
+  burst(c, master, { dur: 0.05, freq: 160, q: 0.7, gain: 0.25, type: "lowpass", decay: 4 });
+}
+
 export function toggleAmbient(kind: Ambient): boolean {
   const c = audio();
   void c.resume();
@@ -127,8 +281,16 @@ export function toggleAmbient(kind: Ambient): boolean {
     playing.delete(kind);
     return false;
   }
-  const start = kind === "rain" ? startRain : kind === "sea" ? startSea : startFire;
-  playing.set(kind, start(c, master!));
+  const starters: Record<Ambient, (c: AudioContext, out: AudioNode) => { stop: () => void }> = {
+    rain: startRain,
+    sea: startSea,
+    fire: startFire,
+    train: startTrain,
+    forest: startForest,
+    library: startLibrary,
+    keys: startKeys,
+  };
+  playing.set(kind, starters[kind](c, master!));
   return true;
 }
 

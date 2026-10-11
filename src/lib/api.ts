@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppInfo, Manifest, Opened } from "../types";
 import type { SearchQuery } from "../store";
+import { markOwn } from "./ownWrites";
 
 export interface NewText {
   id: string;
@@ -20,6 +21,14 @@ export interface FileHits {
   file: string;
   count: number;
   hits: Hit[];
+}
+
+export interface HistoryVersion {
+  source: "snapshot" | "backup";
+  key: string;
+  when: string;
+  label: string;
+  words: number;
 }
 
 export interface Snapshot {
@@ -42,10 +51,18 @@ export const api = {
   projectCreate: (dir: string, name: string, manifest: Manifest, texts: NewText[]) =>
     invoke<string>("project_create", { dir, name, manifest, texts }),
   projectOpen: (path: string) => invoke<Opened>("project_open", { path }),
-  projectSave: (path: string, manifest: Manifest) => invoke<void>("project_save", { path, manifest }),
+  projectSave: async (path: string, manifest: Manifest) => {
+    markOwn("@manifest");
+    await invoke<void>("project_save", { path, manifest });
+    markOwn("@manifest");
+  },
   textRead: (root: string, file: string) => invoke<string>("text_read", { root, file }),
-  textWrite: (root: string, file: string, id: string, title: string, body: string) =>
-    invoke<number>("text_write", { root, file, id, title, body }),
+  textWrite: async (root: string, file: string, id: string, title: string, body: string) => {
+    markOwn(file);
+    const n = await invoke<number>("text_write", { root, file, id, title, body });
+    markOwn(file);
+    return n;
+  },
   textDelete: (root: string, file: string) => invoke<void>("text_delete", { root, file }),
   fileWriteText: (path: string, text: string) => invoke<void>("file_write_text", { path, text }),
   fileWriteBytes: (path: string, bytes: Uint8Array) => invoke<void>("file_write_bytes", { path, bytes: Array.from(bytes) }),
@@ -59,6 +76,9 @@ export const api = {
 
   snapshotCreate: (root: string, id: string, name: string, body: string) => invoke<Snapshot>("snapshot_create", { root, id, name, body }),
   snapshotList: (root: string, id: string) => invoke<Snapshot[]>("snapshot_list", { root, id }),
+  fileReadText: (path: string) => invoke<string>("file_read_text", { path }),
+  textHistory: (root: string, id: string, file: string) => invoke<HistoryVersion[]>("text_history", { root, id, file }),
+  textHistoryRead: (root: string, id: string, file: string, source: string, key: string) => invoke<string>("text_history_read", { root, id, file, source, key }),
   snapshotRead: (root: string, id: string, stamp: string) => invoke<string>("snapshot_read", { root, id, stamp }),
   snapshotDelete: (root: string, id: string, stamp: string) => invoke<void>("snapshot_delete", { root, id, stamp }),
 
@@ -77,6 +97,7 @@ export const api = {
   typeset: (root: string, source: string, files: Record<string, string>, out: string | null) =>
     invoke<{ pages: number; warnings: string[]; bytes: number }>("typeset", { root, source, files, out }),
   typesetLast: () => invoke<ArrayBuffer>("typeset_last"),
+  typesetPage: (index: number, scale: number) => invoke<ArrayBuffer>("typeset_page", { index, scale }),
   typesetFonts: (root: string | null) => invoke<string[]>("typeset_fonts", { root }),
   epubBuild: (root: string, book: unknown, out: string) => invoke<number>("epub_build", { root, book, out }),
   importProject: (kind: ImportKind, path: string) => invoke<Imported>("import_project", { kind, path }),

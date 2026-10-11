@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instalar Escribanía</title>
+<style>
+@font-face { font-family: "Literata"; font-weight: 400; src: url(fonts/literata-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Literata"; font-weight: 400; font-style: italic; src: url(fonts/literata-latin-400-italic.woff2) format("woff2"); }
+@font-face { font-family: "Literata"; font-weight: 600; src: url(fonts/literata-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Literata"; font-weight: 700; src: url(fonts/literata-latin-700-normal.woff2) format("woff2"); }
+:root {
+  --bg: #F4F2EC; --panel: #FFFFFF; --ink: #1E2230; --sub: #6A7182; --line: #DCD9D0;
+  --acc: #3350D1; --acc2: #22306B; --soft: #E3E8FB; --ok: #1E8250; --bad: #B93A28; --gold: #F2CF3B;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--ink); font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; user-select: none; -webkit-font-smoothing: antialiased; }
+button { font: inherit; cursor: pointer; }
+.serif { font-family: "Literata", Georgia, serif; }
+
+/* barra propia */
+.bar { position: fixed; top: 0; left: 0; right: 0; height: 34px; display: flex; align-items: center; padding: 0 4px 0 14px; z-index: 10; }
+.bar .t { flex: 1; font-size: 12px; color: var(--sub); height: 100%; display: flex; align-items: center; }
+.bar button { width: 40px; height: 28px; border: 0; background: transparent; color: var(--sub); border-radius: 6px; display: grid; place-items: center; }
+.bar button:hover { background: rgba(0,0,0,.06); color: var(--ink); }
+.bar button.x:hover { background: #C42B1C; color: #fff; }
+
+.step { position: absolute; inset: 0; padding-top: 34px; opacity: 0; transform: translateY(8px); transition: opacity .45s ease, transform .45s ease; pointer-events: none; }
+.step.on { opacity: 1; transform: none; pointer-events: auto; }
+.dots { position: fixed; bottom: 16px; left: 28px; display: flex; gap: 6px; z-index: 6; }
+.dots b { width: 22px; height: 4px; border-radius: 2px; background: var(--line); transition: background .3s; }
+.dots b.on { background: var(--acc); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 22px; border-radius: 9px; background: var(--acc); color: #fff; font-weight: 600; font-size: 14px; border: 0; transition: filter .15s, transform .1s; }
+.btn:hover { filter: brightness(1.08); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: default; filter: none; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+.btn.ghost:hover { background: rgba(0,0,0,.035); }
+.btn.danger { background: var(--bad); }
+.link { color: var(--acc); background: none; border: 0; padding: 0; font-size: 12.5px; text-decoration: underline; text-underline-offset: 2px; }
+.small { font-size: 11.5px; color: var(--sub); }
+.note { font-size: 12px; padding: 8px 12px; border-radius: 8px; background: var(--soft); color: var(--acc2); }
+.note.bad { background: #F8E3DF; color: var(--bad); }
+
+/* bienvenida */
+.w-grid { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
+.w-art { position: relative; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 45%, #FFFFFF 0, var(--bg) 65%); }
+.w-logo { width: 160px; height: 160px; }
+.w-logo svg { width: 100%; height: 100%; overflow: visible; }
+.drop { transform-origin: 75px 132px; animation: drop 3.2s ease-in-out infinite; }
+@keyframes drop { 0%,40% { transform: translateY(-10px) scale(.2); opacity: 0 } 55% { transform: translateY(0) scale(1); opacity: 1 } 75% { transform: scale(1.2,.6); opacity: 1 } 100% { transform: scale(1.2,.6); opacity: 0 } }
+.ripple { transform-origin: 75px 138px; animation: ripple 3.2s ease-out infinite; }
+@keyframes ripple { 0%,70% { transform: scale(.2); opacity: 0 } 80% { opacity: .7 } 100% { transform: scale(2.4); opacity: 0 } }
+.faded .drop, .faded .ripple { animation: none; opacity: 0; }
+.faded { filter: grayscale(.6); opacity: .75; }
+.w-copy { display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 0 44px 30px; }
+.w-copy h1 { font-family: "Literata", Georgia, serif; font-size: 36px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.1; }
+.w-copy h1.mid { font-size: 28px; }
+.ver { font-family: "Cascadia Mono", Consolas, monospace; font-size: 11px; color: var(--sub); letter-spacing: .04em; }
+.w-copy p { color: var(--sub); font-size: 14px; line-height: 1.5; margin: 0; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.w-meta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+/* opciones */
+.o-wrap { padding: 18px 34px 0; display: grid; gap: 14px; }
+.o-wrap h2 { font-family: "Literata", serif; font-size: 22px; margin: 0; font-weight: 600; }
+.o-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.o-card { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; position: relative; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
+.o-card:hover { border-color: #b9bfd6; }
+.o-card.sel { border-color: var(--acc); box-shadow: 0 0 0 3px var(--soft); }
+.o-card b { font-size: 13.5px; }
+.o-card small { color: var(--sub); font-size: 11.5px; line-height: 1.4; }
+.o-card .ic { width: 30px; height: 30px; border-radius: 8px; background: var(--soft); display: grid; place-items: center; color: var(--acc); margin-bottom: 2px; }
+.o-card .rec { position: absolute; top: 12px; right: 12px; font-size: 9.5px; font-weight: 700; color: var(--acc); letter-spacing: .06em; text-transform: uppercase; }
+.o-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; }
+.o-opt { display: flex; align-items: center; gap: 9px; font-size: 12.5px; cursor: pointer; }
+.o-opt.off { opacity: .4; pointer-events: none; }
+.tog { width: 30px; height: 17px; border-radius: 9px; background: var(--line); position: relative; flex: none; transition: background .15s; }
+.tog::after { content: ""; position: absolute; left: 2px; top: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.tog.on { background: var(--acc); }
+.tog.on::after { left: 15px; }
+.o-path { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-family: "Cascadia Mono", Consolas, monospace; font-size: 11px; color: var(--sub); border-top: 1px solid var(--line); padding-top: 9px; margin-top: 2px; }
+.o-path span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.o-foot { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+.o-foot .err { flex: 1; color: var(--bad); font-size: 12px; }
+
+/* instalando */
+.p-grid { display: grid; grid-template-columns: 330px 1fr; height: 100%; }
+.p-sheet { margin: 24px 0 58px 34px; background: #FFFEF9; border-radius: 3px; box-shadow: 0 8px 24px rgba(0,0,0,.14); padding: 26px; position: relative; overflow: hidden; }
+.p-sheet svg.lines { width: 100%; height: 100%; }
+.write { fill: none; stroke: var(--acc2); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 420; stroke-dashoffset: 420; animation: write 6s ease-in-out infinite; }
+.write.l2 { animation-delay: .9s } .write.l3 { animation-delay: 1.8s } .write.l4 { animation-delay: 2.7s } .write.l5 { animation-delay: 3.6s }
+@keyframes write { 0% { stroke-dashoffset: 420 } 40%,85% { stroke-dashoffset: 0 } 100% { stroke-dashoffset: 0; opacity: 0 } }
+.erase .write { stroke-dashoffset: 0; animation-name: erase; }
+@keyframes erase { 0%,15% { stroke-dashoffset: 0 } 55%,100% { stroke-dashoffset: -420 } }
+.pen { position: absolute; width: 46px; height: 46px; animation: penmove 6s ease-in-out infinite; }
+@keyframes penmove { 0% { left: 30px; top: 30px } 18% { left: 220px; top: 30px } 20% { left: 30px; top: 66px } 38% { left: 230px; top: 66px } 40% { left: 30px; top: 102px } 58% { left: 200px; top: 102px } 60% { left: 30px; top: 138px } 78% { left: 240px; top: 138px } 80% { left: 30px; top: 174px } 100% { left: 150px; top: 174px } }
+.stopped .write, .stopped .pen { animation-play-state: paused; }
+.p-info { padding: 38px 36px 60px 30px; display: flex; flex-direction: column; gap: 14px; }
+.p-info h2 { font-family: "Literata", serif; font-size: 22px; margin: 0; font-weight: 600; }
+.p-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.p-bar i { display: block; height: 100%; width: 2%; background: linear-gradient(90deg, var(--acc), var(--acc2)); border-radius: 3px; transition: width .25s ease; }
+.p-log { display: grid; gap: 7px; font-size: 12.5px; }
+.p-log div { display: flex; gap: 8px; align-items: center; color: var(--sub); }
+.p-log div::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); flex: none; box-sizing: border-box; }
+.p-log div.now { color: var(--ink); }
+.p-log div.now::before { border-color: var(--acc); border-right-color: transparent; animation: spin .8s linear infinite; }
+.p-log div.done { color: var(--ink); }
+.p-log div.done::before { background: var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/9px no-repeat; border-color: var(--ok); }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* lista */
+.d-wrap { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
+.d-left { padding: 36px 34px 60px; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+.seal { width: 64px; height: 64px; border-radius: 50%; background: var(--acc); color: #fff; display: grid; place-items: center; box-shadow: 0 0 0 8px var(--soft); animation: pop .6s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes pop { from { transform: scale(.3); opacity: 0 } }
+.seal.gray { background: var(--sub); box-shadow: 0 0 0 8px #E7E5DF; }
+.d-left h2 { font-family: "Literata", serif; font-size: 28px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+.d-left p { color: var(--sub); font-size: 14px; margin: 0; }
+.d-right { background: var(--panel); border-left: 1px solid var(--line); padding: 30px 30px 50px; display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sub); margin-top: 6px; }
+.themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.themes button { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 6px 4px 5px; display: grid; justify-items: center; gap: 4px; font-size: 11px; color: var(--ink); }
+.themes button span { width: 100%; height: 26px; border-radius: 5px; border: 1px solid rgba(0,0,0,.08); display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+.themes button.sel { border-color: var(--acc); box-shadow: 0 0 0 2px var(--soft); }
+.chk { display: flex; gap: 9px; align-items: center; font-size: 12.5px; cursor: pointer; }
+.chk i { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--line); flex: none; display: grid; place-items: center; font-style: normal; color: #fff; font-size: 11px; }
+.chk.on i { background: var(--acc); border-color: var(--acc); }
+.chk.on i::after { content: "✓"; }
+select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); width: 160px; }
+
+/* licencia */
+.sheet { position: fixed; inset: 34px 0 0; background: var(--bg); z-index: 8; display: none; grid-template-rows: auto 1fr auto; padding: 14px 34px 18px; gap: 10px; }
+.sheet.on { display: grid; }
+.sheet h2 { font-family: "Literata", serif; font-size: 20px; margin: 0; font-weight: 600; }
+.sheet pre { margin: 0; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font: 11.5px/1.5 "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; user-select: text; }
+</style>
+</head>
+<body>
+<div class="bar" data-tauri-drag-region>
+  <span class="t" id="wintitle" data-tauri-drag-region>Instalar Escribanía</span>
+  <button id="min" aria-label="Minimizar"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 5h8" stroke="currentColor" stroke-width="1.2"/></svg></button>
+  <button id="close" class="x" aria-label="Cerrar"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.2"/></svg></button>
+</div>
+
+<!-- 1. Bienvenida -->
+<section class="step" id="s-welcome">
+  <div class="w-grid">
+    <div class="w-art"><div class="w-logo" id="logo"></div></div>
+    <div class="w-copy">
+      <span class="ver" id="w-ver"></span>
+      <h1 id="w-title">Escribanía</h1>
+      <p id="w-text"></p>
+      <div id="w-note"></div>
+      <div class="row">
+        <button class="btn" id="w-go"></button>
+        <button class="btn ghost" id="w-more"></button>
+      </div>
+      <div class="w-meta">
+        <span class="small" id="w-who"></span>
+        <span class="small">GPL-3.0 · <button class="link" id="w-lic"></button></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Opciones -->
+<section class="step" id="s-options">
+  <div class="o-wrap">
+    <h2 id="o-title"></h2>
+    <div class="o-cards">
+      <button class="o-card sel" id="o-user">
+        <span class="rec" id="o-rec"></span>
+        <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+        <b id="o-user-t"></b><small id="o-user-d"></small>
+      </button>
+      <button class="o-card" id="o-port">
+        <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M10 6h4"/></svg></span>
+        <b id="o-port-t"></b><small id="o-port-d"></small>
+      </button>
+    </div>
+    <div class="o-opts">
+      <label class="o-opt" data-k="desktop"><span class="tog"></span><span id="o-desk"></span></label>
+      <label class="o-opt" data-k="associate"><span class="tog"></span><span id="o-assoc"></span></label>
+      <label class="o-opt" data-k="updates"><span class="tog"></span><span id="o-upd"></span></label>
+      <label class="o-opt" data-k="beta"><span class="tog"></span><span id="o-beta"></span></label>
+      <div class="o-path"><span id="o-dir"></span><button class="link" id="o-browse"></button></div>
+    </div>
+    <div class="o-foot">
+      <span class="err" id="o-err"></span>
+      <button class="btn ghost" id="o-back"></button>
+      <button class="btn" id="o-go"></button>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Instalando / desinstalando -->
+<section class="step" id="s-progress">
+  <div class="p-grid">
+    <div class="p-sheet" id="p-sheet">
+      <svg class="lines" viewBox="0 0 280 200" preserveAspectRatio="none">
+        <path class="write l1" d="M10 22 C30 10, 40 30, 60 18 S 90 26, 110 16 S 150 24, 180 18 S 220 22, 250 16"/>
+        <path class="write l2" d="M10 58 C25 50, 45 64, 70 54 S 110 62, 140 52 S 180 60, 210 54 S 240 58, 262 52"/>
+        <path class="write l3" d="M10 94 C30 86, 50 100, 80 90 S 120 96, 150 88 S 190 96, 230 88"/>
+        <path class="write l4" d="M10 130 C25 120, 55 138, 85 126 S 130 134, 165 124 S 210 132, 270 124"/>
+        <path class="write l5" d="M10 166 C30 158, 60 172, 95 162 S 140 170, 180 160"/>
+      </svg>
+      <svg class="pen" viewBox="0 0 46 46"><g transform="rotate(35 23 23)"><path d="M23 44 L15 26 L17 14 L29 14 L31 26 Z" fill="#2B3152"/><circle cx="23" cy="27" r="2" fill="#F2CF3B"/></g></svg>
+    </div>
+    <div class="p-info">
+      <span class="ver" id="p-count"></span>
+      <h2 id="p-title"></h2>
+      <div class="p-bar"><i id="p-bar"></i></div>
+      <div class="p-log" id="p-log"></div>
+      <div id="p-err"></div>
+      <span class="small" id="p-hint"></span>
+      <div class="row" id="p-acts" style="display:none">
+        <button class="btn" id="p-retry"></button>
+        <button class="btn ghost" id="p-quit"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Lista -->
+<section class="step" id="s-done">
+  <div class="d-wrap">
+    <div class="d-left">
+      <div class="seal"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <h2 id="d-title"></h2>
+      <p id="d-text"></p>
+      <div class="row"><button class="btn" id="d-go"></button><button class="btn ghost" id="d-close"></button></div>
+    </div>
+    <div class="d-right">
+      <span class="lbl" id="d-theme"></span>
+      <div class="themes" id="themes"></div>
+      <span class="lbl" id="d-start"></span>
+      <div class="chk on" id="d-sample"><i></i><span id="d-sample-t"></span></div>
+      <div class="chk on" id="d-tour"><i></i><span id="d-tour-t"></span></div>
+      <span class="lbl" id="d-lang"></span>
+      <select id="lang"><option value="es">Español</option><option value="en">English</option></select>
+    </div>
+  </div>
+</section>
+
+<!-- Desinstalar -->
+<section class="step" id="s-uninstall">
+  <div class="w-grid">
+    <div class="w-art"><div class="w-logo faded" id="logo2"></div></div>
+    <div class="w-copy">
+      <span class="ver" id="u-ver"></span>
+      <h1 class="mid" id="u-title"></h1>
+      <p id="u-text"></p>
+      <div class="chk" id="u-data"><i></i><span id="u-data-t"></span></div>
+      <div class="row">
+        <button class="btn danger" id="u-go"></button>
+        <button class="btn ghost" id="u-repair"></button>
+        <button class="link" id="u-cancel" style="margin-left:6px"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Desinstalada -->
+<section class="step" id="s-gone">
+  <div class="d-wrap" style="grid-template-columns:1fr">
+    <div class="d-left" style="align-items:center;text-align:center">
+      <div class="seal gray"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <h2 id="g-title"></h2>
+      <p id="g-text" style="max-width:440px"></p>
+      <button class="btn ghost" id="g-close"></button>
+    </div>
+  </div>
+</section>
+
+<div class="sheet" id="lic">
+  <h2 id="lic-title"></h2>
+  <pre id="lic-text"></pre>
+  <div class="o-foot"><button class="btn" id="lic-close"></button></div>
+</div>
+
+<div class="dots" id="dots"><b></b><b></b><b></b><b></b></div>
+
+<script>
+const T = {
+  es: {
+    win: "Instalar Escribanía", winU: "Desinstalar Escribanía", winR: "Reparar Escribanía",
+    ver: (v, mb) => `VERSIÓN ${v}` + (mb ? ` · ${String(mb).replace(".", ",")} MB` : ""),
+    tagline: "Escribe, estructura y termina tu libro. Libre, sin cuentas y sin conexión.",
+    hasOld: (o, v) => `Tienes la ${o}. Al actualizar a la ${v} tus proyectos y ajustes se quedan como están.`,
+    hasSame: (v) => `La ${v} ya está instalada. Puedes reinstalarla si algo no funciona.`,
+    hasNewer: (o) => `Tienes una versión más nueva (${o}). Si sigues, se sustituye por esta.`,
+    running: "Escribanía está abierta: se cerrará guardando tus textos antes de instalar.",
+    install: "Instalar", update: "Actualizar", reinstall: "Reinstalar", more: "Más opciones",
+    who: "Para tu usuario · sin administrador", license: "licencia",
+    oTitle: "¿Cómo quieres instalarla?", rec: "Recomendado",
+    userT: "En este equipo", userD: "Solo para ti, sin pedir permisos. Se actualiza sola.",
+    portT: "Portable en un USB", portD: "Todo en una carpeta: ajustes, copias y cuaderno viajan contigo.",
+    desk: "Acceso en el escritorio", assoc: "Abrir los .escribania con Escribanía", upd: "Buscar actualizaciones", beta: "Canal beta",
+    change: "Cambiar…", back: "Atrás",
+    pCount: (a, b) => `PASO ${a} DE ${b}`,
+    pInstall: "Escribiendo Escribanía en tu equipo…", pPortable: "Escribiendo Escribanía en la carpeta…", pRepair: "Reparando Escribanía…", pUninstall: "Borrando Escribanía…",
+    steps: { close: "Cerrando Escribanía si estaba abierta", keep: "Guardando la versión anterior", copy: "Copiando el editor, la Imprenta y los diccionarios", links: "Accesos directos y archivos .escribania", register: "Registrando en Windows", check: "Comprobando lo copiado" },
+    stepsU: { close: "Cerrando Escribanía si estaba abierta", links: "Quitando accesos directos y asociaciones", register: "Borrando la entrada de Windows", copy: "Borrando el programa", keep: "Borrando ajustes, cuaderno y copias", check: "Terminado" },
+    stepsP: { close: "Cerrando Escribanía si estaba abierta", keep: "Guardando la versión anterior", copy: "Copiando el programa", links: "Activando el modo portable", check: "Comprobando lo copiado" },
+    hint: "Tus proyectos no se tocan: viven en sus propias carpetas.",
+    retry: "Reintentar", quit: "Cerrar",
+    dTitle: "La tinta ya está seca.", dText: (v) => `Escribanía ${v} está instalada. Elige cómo quieres empezar y ponte a escribir.`,
+    dTextP: (v) => `Escribanía ${v} está en la carpeta, lista para llevártela. Ábrela con Escribania.exe.`,
+    dTextR: (v) => `Escribanía ${v} está reparada. Tus proyectos y ajustes siguen como estaban.`,
+    go: "Empezar a escribir", close: "Cerrar", theme: "Tema", start: "Para empezar", sample: "Abrir el proyecto de ejemplo «La casa del faro»", tour: "Ver el recorrido de dos minutos", lang: "Idioma",
+    uTitle: "¿Desinstalar Escribanía?", uText: "Se quitan el programa, sus accesos directos y su entrada en Windows. Tus proyectos no se tocan: viven en sus carpetas.",
+    uData: "Borrar también ajustes, cuaderno de ideas y copias de seguridad", uGo: "Desinstalar", uRepair: "Reparar", cancel: "Cancelar",
+    rTitle: "Reparar Escribanía", rText: "Vuelve a copiar el programa, los accesos directos y la asociación de archivos. Tus proyectos y ajustes no se tocan.", rGo: "Reparar",
+    gTitle: "Escribanía se ha desinstalado.", gText: "Gracias por escribir con ella. Tus proyectos siguen en sus carpetas, por si algún día vuelves.",
+    licTitle: "Licencia Pública General de GNU, versión 3", noPayload: "Este instalador se compiló sin Escribanía dentro.",
+  },
+  en: {
+    win: "Install Escribanía", winU: "Uninstall Escribanía", winR: "Repair Escribanía",
+    ver: (v, mb) => `VERSION ${v}` + (mb ? ` · ${mb} MB` : ""),
+    tagline: "Write, structure and finish your book. Free, no accounts, no connection needed.",
+    hasOld: (o, v) => `You have ${o}. Updating to ${v} keeps your projects and settings as they are.`,
+    hasSame: (v) => `${v} is already installed. You can reinstall it if something isn't working.`,
+    hasNewer: (o) => `You have a newer version (${o}). Continuing replaces it with this one.`,
+    running: "Escribanía is open: it will close, saving your work, before installing.",
+    install: "Install", update: "Update", reinstall: "Reinstall", more: "More options",
+    who: "For your user · no administrator", license: "license",
+    oTitle: "How do you want to install it?", rec: "Recommended",
+    userT: "On this computer", userD: "Just for you, no permissions needed. Updates itself.",
+    portT: "Portable on a USB drive", portD: "Everything in one folder: settings, backups and notebook travel with you.",
+    desk: "Desktop shortcut", assoc: "Open .escribania files with Escribanía", upd: "Check for updates", beta: "Beta channel",
+    change: "Change…", back: "Back",
+    pCount: (a, b) => `STEP ${a} OF ${b}`,
+    pInstall: "Writing Escribanía onto your computer…", pPortable: "Writing Escribanía into the folder…", pRepair: "Repairing Escribanía…", pUninstall: "Erasing Escribanía…",
+    steps: { close: "Closing Escribanía if it was open", keep: "Keeping the previous version", copy: "Copying the editor, the Press and the dictionaries", links: "Shortcuts and .escribania files", register: "Registering with Windows", check: "Checking the copy" },
+    stepsU: { close: "Closing Escribanía if it was open", links: "Removing shortcuts and file associations", register: "Removing the Windows entry", copy: "Removing the program", keep: "Removing settings, notebook and backups", check: "Done" },
+    stepsP: { close: "Closing Escribanía if it was open", keep: "Keeping the previous version", copy: "Copying the program", links: "Turning on portable mode", check: "Checking the copy" },
+    hint: "Your projects aren't touched: they live in their own folders.",
+    retry: "Try again", quit: "Close",
+    dTitle: "The ink is dry.", dText: (v) => `Escribanía ${v} is installed. Choose how to begin and start writing.`,
+    dTextP: (v) => `Escribanía ${v} is in the folder, ready to take with you. Open it with Escribania.exe.`,
+    dTextR: (v) => `Escribanía ${v} is repaired. Your projects and settings are as they were.`,
+    go: "Start writing", close: "Close", theme: "Theme", start: "To begin", sample: "Open the sample project “The Lighthouse”", tour: "Take the two-minute tour", lang: "Language",
+    uTitle: "Uninstall Escribanía?", uText: "This removes the program, its shortcuts and its Windows entry. Your projects aren't touched: they live in their own folders.",
+    uData: "Also delete settings, idea notebook and backups", uGo: "Uninstall", uRepair: "Repair", cancel: "Cancel",
+    rTitle: "Repair Escribanía", rText: "Copies the program, shortcuts and file association again. Your projects and settings aren't touched.", rGo: "Repair",
+    gTitle: "Escribanía has been uninstalled.", gText: "Thanks for writing with it. Your projects are still in their folders, in case you come back.",
+    licTitle: "GNU General Public License, version 3", noPayload: "This installer was built without Escribanía inside.",
+  },
+};
+const L = (navigator.language || "es").toLowerCase().startsWith("es") ? "es" : "en";
+const t = T[L];
+const $ = (id) => document.getElementById(id);
+const tauri = window.__TAURI__;
+const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
+
+const NIB = `<svg viewBox="0 0 150 150"><defs><linearGradient id="ng" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#FBF8EE"/><stop offset="1" stop-color="#E8E0CC"/></linearGradient></defs>
+<rect x="10" y="10" width="130" height="130" rx="32" fill="#3350D1"/>
+<g transform="rotate(-28 75 75)"><path d="M75 122 L50 70 L54 48 L62 32 L88 32 L96 48 L100 70 Z" fill="url(#ng)"/><rect x="62" y="24" width="26" height="10" fill="#D6CDBA"/><circle cx="75" cy="72" r="5" fill="#3350D1"/><path d="M74 76 L76 76 L75.4 116 L74.6 116Z" fill="#3350D1"/></g>
+<circle class="drop" cx="75" cy="132" r="6" fill="#F2CF3B"/><ellipse class="ripple" cx="75" cy="138" rx="10" ry="3" fill="none" stroke="#F2CF3B" stroke-width="1.5"/></svg>`;
+$("logo").innerHTML = NIB;
+$("logo2").innerHTML = NIB.replace('id="ng"', 'id="ng2"').replace("url(#ng)", "url(#ng2)");
+
+const THEMES = [["algodon", "Algodón", "#E6E8EC", "#3350D1"], ["tinta", "Tinta", "#131A2A", "#8EA2FF"], ["olivetti", "Olivetti", "#E3DACA", "#4F6B2A"], ["pizarra", "Pizarra", "#212426", "#E9B04B"]];
+let info = null, installedDir = "", job = "install", theme = "algodon", prefsTouched = false;
+const opts = { portable: false, desktop: true, associate: true, updates: true, beta: false, dir: "" };
+
+function text(id, s) { $(id).textContent = s; }
+function show(id, dot) {
+  document.querySelectorAll(".step").forEach((s) => s.classList.toggle("on", s.id === id));
+  $("dots").style.display = dot == null ? "none" : "flex";
+  if (dot != null) document.querySelectorAll("#dots b").forEach((b, i) => b.classList.toggle("on", i === dot));
+}
+function note(id, kind, msg) { $(id).innerHTML = msg ? `<div class="note ${kind}">${msg}</div>` : ""; }
+
+function fill() {
+  text("w-lic", t.license); text("w-who", t.who); text("w-more", t.more);
+  text("o-title", t.oTitle); text("o-rec", t.rec); text("o-user-t", t.userT); text("o-user-d", t.userD); text("o-port-t", t.portT); text("o-port-d", t.portD);
+  text("o-desk", t.desk); text("o-assoc", t.assoc); text("o-upd", t.upd); text("o-beta", t.beta); text("o-browse", t.change); text("o-back", t.back);
+  text("p-hint", t.hint); text("p-retry", t.retry); text("p-quit", t.quit);
+  text("d-title", t.dTitle); text("d-go", t.go); text("d-close", t.close); text("d-theme", t.theme); text("d-start", t.start);
+  text("d-sample-t", t.sample); text("d-tour-t", t.tour); text("d-lang", t.lang);
+  text("u-data-t", t.uData); text("u-go", t.uGo); text("u-repair", t.uRepair); text("u-cancel", t.cancel);
+  text("g-title", t.gTitle); text("g-text", t.gText); text("g-close", t.close);
+  text("lic-title", t.licTitle); text("lic-close", t.close);
+  $("lang").value = L;
+  $("themes").innerHTML = THEMES.map(([id, name, bg, acc]) => `<button data-theme="${id}" class="${id === theme ? "sel" : ""}"><span><i style="background:${bg}"></i><i style="background:${acc}"></i></span>${name}</button>`).join("");
+}
+
+function refreshOptions() {
+  $("o-user").classList.toggle("sel", !opts.portable);
+  $("o-port").classList.toggle("sel", opts.portable);
+  document.querySelectorAll(".o-opt").forEach((el) => {
+    const k = el.dataset.k;
+    el.querySelector(".tog").classList.toggle("on", !!opts[k]);
+    el.classList.toggle("off", (opts.portable && (k === "desktop" || k === "associate")) || (k === "beta" && !opts.updates));
+  });
+  text("o-dir", "📁 " + opts.dir);
+  text("o-go", info.installedVersion && !opts.portable ? (info.installedVersion === info.version ? t.reinstall : t.update) : t.install);
+}
+
+async function start() {
+  fill();
+  try { info = await invoke("setup_info"); } catch (e) { info = { version: "?", mode: "install", installDir: "", portableDir: "", sizeMb: 0 }; }
+  opts.dir = info.installDir;
+  text("w-ver", t.ver(info.version, info.sizeMb)); text("u-ver", t.ver(info.installedVersion || info.version));
+  if (info.mode === "uninstall") {
+    text("wintitle", t.winU); text("u-title", t.uTitle); text("u-text", t.uText);
+    show("s-uninstall");
+    return;
+  }
+  if (info.mode === "repair") {
+    text("wintitle", t.winR); text("u-title", t.rTitle); text("u-text", t.rText);
+    $("u-data").style.display = "none"; $("u-go").style.display = "none";
+    text("u-repair", t.rGo); $("u-repair").className = "btn";
+    show("s-uninstall");
+    return;
+  }
+  text("wintitle", t.win);
+  text("w-text", t.tagline);
+  let msg = "";
+  if (info.downgrade) msg = t.hasNewer(info.installedVersion);
+  else if (info.installedVersion === info.version) msg = t.hasSame(info.version);
+  else if (info.installedVersion) msg = t.hasOld(info.installedVersion, info.version);
+  if (info.appRunning) msg += (msg ? " " : "") + t.running;
+  note("w-note", "", msg);
+  text("w-go", info.installedVersion ? (info.installedVersion === info.version ? t.reinstall : t.update) : t.install);
+  opts.desktop = info.installedVersion ? !!info.hasDesktopShortcut : true;
+  refreshOptions();
+  show("s-welcome", 0);
+}
+
+function stepList(kind) {
+  if (kind === "uninstall") {
+    const keys = ["close", "links", "register", "copy"];
+    if (!$("u-data").classList.contains("on")) return keys;
+    return keys.concat("keep");
+  }
+  if (opts.portable) return ["close", "keep", "copy", "links", "check"];
+  return ["close", "keep", "copy", "links", "register", "check"];
+}
+let order = [];
+function renderLog(kind, current, finished) {
+  const labels = kind === "uninstall" ? t.stepsU : opts.portable ? t.stepsP : t.steps;
+  const idx = order.indexOf(current);
+  $("p-log").innerHTML = order.map((k, i) => `<div class="${finished || i < idx ? "done" : i === idx ? "now" : ""}">${labels[k]}</div>`).join("");
+  text("p-count", t.pCount(Math.min(order.length, Math.max(1, idx + 1)), order.length));
+}
+
+tauri.event.listen("progress", (e) => {
+  const { percent, step } = e.payload;
+  $("p-bar").style.width = Math.max(2, percent) + "%";
+  if (order.includes(step)) renderLog(job === "uninstall" ? "uninstall" : "install", step, false);
+});
+
+async function runInstall(kind) {
+  job = kind;
+  order = stepList("install");
+  $("p-sheet").classList.remove("erase", "stopped");
+  $("p-bar").style.width = "2%";
+  note("p-err", "bad", ""); $("p-acts").style.display = "none";
+  text("p-title", kind === "repair" ? t.pRepair : opts.portable ? t.pPortable : t.pInstall);
+  renderLog("install", order[0], false);
+  show("s-progress", 2);
+  const updates = kind === "repair" ? "" : !opts.updates ? "off" : opts.beta ? "beta" : "stable";
+  try {
+    installedDir = await invoke("install", { opts: { dir: opts.dir, portable: opts.portable, desktop: opts.desktop, associate: opts.associate, updates } });
+    renderLog("install", "check", true);
+    $("p-sheet").classList.add("stopped");
+    setTimeout(() => {
+      text("d-text", kind === "repair" ? t.dTextR(info.version) : opts.portable ? t.dTextP(info.version) : t.dText(info.version));
+      // Al actualizar o reparar, el tema y el proyecto de ejemplo ya no vienen al caso.
+      const fresh = kind === "install" && (!info.installedVersion || opts.portable);
+      document.querySelector(".d-right").style.display = fresh ? "" : "none";
+      $("s-done").querySelector(".d-wrap").style.gridTemplateColumns = fresh ? "" : "1fr";
+      if (!fresh) { $("d-sample").classList.remove("on"); $("d-tour").classList.remove("on"); }
+      show("s-done", 3);
+    }, 650);
+  } catch (e) {
+    $("p-sheet").classList.add("stopped");
+    note("p-err", "bad", String(e));
+    $("p-acts").style.display = "flex";
+  }
+}
+
+async function runUninstall() {
+  job = "uninstall";
+  order = stepList("uninstall");
+  $("p-sheet").classList.add("erase"); $("p-sheet").classList.remove("stopped");
+  $("p-bar").style.width = "2%";
+  text("p-title", t.pUninstall);
+  renderLog("uninstall", order[0], false);
+  show("s-progress");
+  try {
+    await invoke("uninstall", { dir: info.installDir, keepData: !$("u-data").classList.contains("on") });
+    renderLog("uninstall", order[order.length - 1], true);
+    setTimeout(() => show("s-gone"), 650);
+  } catch (e) {
+    $("p-sheet").classList.add("stopped");
+    note("p-err", "bad", String(e));
+    $("p-acts").style.display = "flex";
+  }
+}
+
+$("w-go").onclick = () => runInstall("install");
+$("w-more").onclick = () => { refreshOptions(); show("s-options", 1); };
+$("o-back").onclick = () => show("s-welcome", 0);
+$("o-go").onclick = () => runInstall("install");
+$("o-user").onclick = () => { opts.portable = false; opts.dir = info.installDir; refreshOptions(); };
+$("o-port").onclick = () => { opts.portable = true; opts.dir = info.portableDir; refreshOptions(); };
+document.querySelectorAll(".o-opt").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); opts[el.dataset.k] = !opts[el.dataset.k]; refreshOptions(); }));
+$("o-browse").onclick = async () => { const d = await invoke("pick_dir"); if (d) { opts.dir = d; refreshOptions(); } };
+$("p-retry").onclick = () => (job === "uninstall" ? runUninstall() : runInstall(job));
+$("p-quit").onclick = $("close").onclick = $("d-close").onclick = $("g-close").onclick = $("u-cancel").onclick = () => invoke("quit");
+$("min").onclick = () => tauri.window.getCurrentWindow().minimize();
+$("themes").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; theme = b.dataset.theme; prefsTouched = true; document.querySelectorAll("#themes button").forEach((x) => x.classList.toggle("sel", x === b)); });
+for (const id of ["d-sample", "d-tour", "u-data"]) $(id).onclick = () => $(id).classList.toggle("on");
+$("d-go").onclick = async () => {
+  try {
+    if (prefsTouched || $("lang").value !== L || document.querySelector(".d-right").style.display !== "none") await invoke("set_prefs", { dir: installedDir, portable: opts.portable, theme, lang: $("lang").value });
+    await invoke("launch", { dir: installedDir, sample: $("d-sample").classList.contains("on"), tour: $("d-tour").classList.contains("on") });
+  } catch (e) { /* abrirla a mano no es grave */ }
+  invoke("quit");
+};
+$("u-go").onclick = runUninstall;
+$("u-repair").onclick = () => { opts.dir = info.installDir; opts.portable = false; opts.desktop = !!info.hasDesktopShortcut; opts.associate = true; runInstall("repair"); };
+$("w-lic").onclick = async () => { $("lic-text").textContent = await invoke("license"); $("lic").classList.add("on"); };
+$("lic-close").onclick = () => $("lic").classList.remove("on");
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("lic").classList.remove("on"); });
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+start();
+</script>
+</body>
+</html>

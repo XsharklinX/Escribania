@@ -146,6 +146,7 @@ pub struct Compiled {
     pub pdf: Vec<u8>,
     pub pages: usize,
     pub warnings: Vec<String>,
+    pub doc: Option<PagedDocument>,
 }
 
 /// Compila un documento Typst a PDF. `files`: nombre usado en el documento → bytes.
@@ -172,11 +173,28 @@ pub fn compile(source: &str, files: HashMap<String, Vec<u8>>, extra_font_dirs: &
         let msgs: Vec<String> = errs.iter().map(|e| e.message.to_string()).collect();
         format!("No se pudo generar el PDF: {}", msgs.join("; "))
     })?;
-    Ok(Compiled { pdf, pages, warnings })
+    Ok(Compiled { pdf, pages, warnings, doc: Some(doc) })
 }
 
 /// Último PDF compuesto, para la vista previa (se pide aparte como binario).
 static LAST: Mutex<Option<Vec<u8>>> = Mutex::new(None);
+/// Y el documento compuesto, para pintar páginas sueltas (vista de pliegos).
+static LAST_DOC: Mutex<Option<PagedDocument>> = Mutex::new(None);
+
+/// Una página del último documento como PNG (`scale`: píxeles por punto).
+#[tauri::command]
+pub async fn typeset_page(index: usize, scale: f32) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let guard = LAST_DOC.lock().map_err(|e| e.to_string())?;
+        let doc = guard.as_ref().ok_or("No hay vista previa")?;
+        let page = doc.pages().get(index).ok_or("Esa página no existe")?;
+        let opts = typst_render::RenderOptions { pixel_per_pt: typst::utils::Scalar::new(scale.clamp(0.2, 4.0) as f64), ..Default::default() };
+        let png = typst_render::render(page, &opts).encode_png().map_err(|e| e.to_string())?;
+        Ok(tauri::ipc::Response::new(png))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 #[derive(Serialize)]
 pub struct TypesetInfo {
@@ -205,6 +223,7 @@ pub async fn typeset(app: tauri::AppHandle, root: String, source: String, files:
         }
         let info = TypesetInfo { pages: c.pages, warnings: c.warnings, bytes: c.pdf.len() };
         *LAST.lock().map_err(|e| e.to_string())? = Some(c.pdf);
+        *LAST_DOC.lock().map_err(|e| e.to_string())? = c.doc;
         Ok(info)
     })
     .await

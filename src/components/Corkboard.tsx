@@ -7,6 +7,7 @@ import { locate, moveNode, moveToSection, walk, wordsOf, type DropZone } from ".
 import { formatNumber } from "../lib/words";
 import { povColor } from "../lib/model";
 import { createNode } from "./Binder";
+import FreeCork from "./FreeCork";
 
 type Item = { kind: "header"; id: string; title: string } | { kind: "card"; node: TreeNode };
 
@@ -26,6 +27,7 @@ export default function Corkboard() {
   const lang = useStore((s) => s.settings.lang);
   const edit = useStore((s) => s.editManifest);
   const [scope, setScope] = useState<"folder" | "book">("folder");
+  const [free, setFree] = useState(false);
   const [drop, setDrop] = useState<{ id: string; zone: DropZone } | null>(null);
   const dragId = useRef<string | null>(null);
 
@@ -71,11 +73,20 @@ export default function Corkboard() {
             {t("cork.book")}
           </button>
         </div>
+        <div className="seg">
+          <button className={!free ? "on" : ""} onClick={() => setFree(false)}>
+            {t("fc.grid")}
+          </button>
+          <button className={free ? "on" : ""} onClick={() => setFree(true)}>
+            {t("fc.free")}
+          </button>
+        </div>
         <button className="btn" onClick={newCard}>
           <FilePlus2 size={15} /> {t("cork.newCard")}
         </button>
       </div>
-      <div
+      {free && <FreeCork nodes={items.flatMap((it) => (it.kind === "card" ? [it.node] : []))} />}
+      {!free && <div
         className="cork"
         onDragOver={(e) => dragId.current && e.preventDefault()}
         onDrop={(e) => {
@@ -112,7 +123,7 @@ export default function Corkboard() {
             />
           ),
         )}
-      </div>
+      </div>}
     </div>
   );
 }

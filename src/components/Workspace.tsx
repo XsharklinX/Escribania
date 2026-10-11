@@ -9,6 +9,7 @@ import { formatNumber } from "../lib/words";
 import { closeProject } from "../lib/projects";
 import { flushAll } from "../lib/saver";
 import { stopAllAmbient } from "../lib/ambient";
+import { matches } from "../lib/shortcuts";
 import Binder, { createNode } from "./Binder";
 import SearchPanel from "./SearchPanel";
 import EditorPane from "./EditorPane";
@@ -36,9 +37,14 @@ import CronosView from "./CronosView";
 import MapView from "./MapView";
 import LinajesView from "./LinajesView";
 import ImportDialog from "./ImportDialog";
+import TimeMachine from "./TimeMachine";
+import Tour from "./Tour";
+import SyncDialogs from "./SyncDialogs";
+import RepasoView from "./RepasoView";
+import CalendarView from "./CalendarView";
 
 export async function setRetiro(on: boolean) {
-  useStore.setState({ retiro: on, view: on ? "hoja" : useStore.getState().view });
+  useStore.setState({ retiro: on, view: on ? "hoja" : useStore.getState().view, ...(on ? {} : { noNet: false }) });
   if (!on) stopAllAmbient();
   try {
     await getCurrentWindow().setFullscreen(on);
@@ -61,6 +67,8 @@ export const VIEWS: { id: View; key: TKey }[] = [
   { id: "linajes", key: "view.linajes" },
   { id: "mural", key: "view.mural" },
   { id: "pulso", key: "view.pulso" },
+  { id: "repaso", key: "view.repaso" },
+  { id: "calendario", key: "view.calendario" },
   { id: "imprenta", key: "view.imprenta" },
   { id: "termometro", key: "view.termometro" },
 ];
@@ -68,15 +76,15 @@ export const VIEWS: { id: View; key: TKey }[] = [
 /** Barra de vistas: sueltas o agrupadas en un desplegable. */
 const NAV: (View | { key: TKey; views: View[] })[] = [
   "hoja",
-  { key: "view.group.plan", views: ["corcho", "escaleta", "rejilla", "estructura", "copo"] },
+  { key: "view.group.plan", views: ["corcho", "escaleta", "rejilla", "estructura", "copo", "calendario"] },
   { key: "view.group.world", views: ["codice", "telarana", "cronos", "mapa", "linajes", "mural"] },
-  "pulso",
+  { key: "view.group.review", views: ["pulso", "repaso"] },
   "imprenta",
   "termometro",
 ];
 
 /** Vistas que ocupan toda la ventana (sin Legajo ni Inspector). */
-const FULL: View[] = ["codice", "telarana", "mural", "termometro", "rejilla", "copo", "cronos", "mapa", "linajes", "pulso", "imprenta"];
+const FULL: View[] = ["codice", "telarana", "mural", "termometro", "rejilla", "copo", "cronos", "mapa", "linajes", "pulso", "imprenta", "repaso", "calendario"];
 
 function NavGroup({ label, views, current }: { label: string; views: View[]; current: View }) {
   const t = useT();
@@ -144,6 +152,7 @@ export default function Workspace() {
   const leftPanel = useStore((s) => s.leftPanel);
   const palette = useStore((s) => s.palette);
   const sprint = useStore((s) => s.sprint);
+  const timeMachine = useStore((s) => s.timeMachine);
   const m = project.manifest;
   const total = bookWords(m, words);
   const full = FULL.includes(view);
@@ -152,44 +161,27 @@ export default function Workspace() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-      const ctrl = e.ctrlKey || e.metaKey;
-      const k = e.key.toLowerCase();
-      if (e.key === "F11") {
+      const run = (fn: () => void) => {
         e.preventDefault();
-        void setRetiro(!st.retiro);
-      } else if (e.key === "Escape" && st.retiro && !st.dialog && !st.palette) {
-        e.preventDefault();
-        void setRetiro(false);
-      } else if (ctrl && k === "k") {
-        e.preventDefault();
-        useStore.setState({ palette: !st.palette });
-      } else if (ctrl && e.shiftKey && k === "f") {
-        e.preventDefault();
-        useStore.setState({ leftPanel: "search", view: FULL.includes(st.view) ? "hoja" : st.view });
-        st.setSettings({ binderOpen: true });
-        setTimeout(() => document.getElementById("search-query")?.focus(), 30);
-      } else if (ctrl && k === "s") {
-        e.preventDefault();
-        void flushAll();
-      } else if (ctrl && !e.shiftKey && k === "n") {
-        e.preventDefault();
-        createNode("text");
-      } else if (ctrl && e.shiftKey && k === "n") {
-        e.preventDefault();
-        createNode("folder");
-      } else if (ctrl && k === "e") {
-        e.preventDefault();
-        useStore.setState({ dialog: "export" });
-      } else if (ctrl && e.key === ",") {
-        e.preventDefault();
-        useStore.setState({ dialog: "settings" });
-      } else if (ctrl && e.key === "1") {
-        e.preventDefault();
-        st.setSettings({ binderOpen: !st.settings.binderOpen });
-      } else if (ctrl && e.key === "3") {
-        e.preventDefault();
-        st.setSettings({ inspectorOpen: !st.settings.inspectorOpen });
-      }
+        fn();
+      };
+      if (matches(e, "retiro")) run(() => void setRetiro(!st.retiro));
+      else if (e.key === "Escape" && st.retiro && !st.dialog && !st.palette) run(() => void setRetiro(false));
+      else if (matches(e, "palette")) run(() => useStore.setState({ palette: !st.palette }));
+      else if (matches(e, "search"))
+        run(() => {
+          useStore.setState({ leftPanel: "search", view: FULL.includes(st.view) ? "hoja" : st.view });
+          st.setSettings({ binderOpen: true });
+          setTimeout(() => document.getElementById("search-query")?.focus(), 30);
+        });
+      else if (matches(e, "save")) run(() => void flushAll());
+      else if (matches(e, "newText")) run(() => createNode("text"));
+      else if (matches(e, "newFolder")) run(() => createNode("folder"));
+      else if (matches(e, "export")) run(() => useStore.setState({ dialog: "export" }));
+      else if (matches(e, "settings")) run(() => useStore.setState({ dialog: "settings" }));
+      else if (matches(e, "binder")) run(() => st.setSettings({ binderOpen: !st.settings.binderOpen }));
+      else if (matches(e, "inspector")) run(() => st.setSettings({ inspectorOpen: !st.settings.inspectorOpen }));
+      else if (matches(e, "timeMachine") && st.selected && locate(st.project!.manifest, st.selected)?.node.type === "text") run(() => useStore.setState({ timeMachine: st.selected }));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -245,6 +237,12 @@ export default function Workspace() {
     case "linajes":
       main = <LinajesView />;
       break;
+    case "repaso":
+      main = <RepasoView />;
+      break;
+    case "calendario":
+      main = <CalendarView />;
+      break;
     default:
       main = <EditorPane />;
   }
@@ -299,7 +297,7 @@ export default function Workspace() {
         <button className="icon-btn" title={`${t("nb.title")} (Ctrl+Alt+I)`} onClick={() => useStore.setState({ dialog: "capture" })}>
           <Lightbulb size={17} />
         </button>
-        <button className="icon-btn" title={t("tb.retiro")} onClick={() => void setRetiro(true)}>
+        <button className="icon-btn" data-tour="retiro" title={t("tb.retiro")} onClick={() => void setRetiro(true)}>
           <Maximize2 size={17} />
         </button>
         <button className="icon-btn" title={t("tb.export")} onClick={() => useStore.setState({ dialog: "export" })}>
@@ -336,6 +334,9 @@ export default function Workspace() {
       {dialog === "capture" && <Notebook />}
       {dialog === "sprint" && <SprintDialog />}
       {dialog === "import" && <ImportDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {timeMachine && <TimeMachine id={timeMachine} />}
+      <Tour />
+      <SyncDialogs />
     </div>
   );
 }

@@ -2,7 +2,10 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Ventana principal de Escribanía.",
-  "windows": ["main"],
+  "windows": [
+    "main",
+    "panel-*"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-set-fullscreen",
@@ -21,6 +24,10 @@
     "dialog:allow-ask",
     "opener:allow-open-path",
     "opener:allow-reveal-item-in-dir",
-    "opener:allow-open-url"
+    "opener:allow-open-url",
+    "core:webview:allow-set-webview-zoom",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-close",
+    "core:window:allow-set-always-on-top"
   ]
 }

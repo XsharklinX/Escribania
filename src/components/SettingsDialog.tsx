@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { RotateCcw } from "lucide-react";
+import { SHORTCUTS, comboFor, comboOf, type ShortcutId } from "../lib/shortcuts";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useStore } from "../store";
 import type { FontId, Lang, QuoteStyle, ThemeId } from "../types";
 import { useT, type TKey } from "../lib/i18n";
-import { backupNow, startBackups } from "../lib/saver";
+import { backupNow, flushAll, startBackups } from "../lib/saver";
+import { checkForUpdate, rollback, useUpdate } from "../lib/updater";
+import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
+import { createSaga, joinSaga, leaveSaga, pushSaga, sagaInfo, type SagaFile } from "../lib/saga";
 import Modal from "./Modal";
+import ExtensionsTab from "./ExtensionsTab";
 import { ttsAvailable, voicesFor } from "../lib/tts";
 
 const THEMES: { id: ThemeId; name: string; colors: string[] }[] = [
@@ -21,7 +27,7 @@ const FONTS: { id: FontId; name: string; css: string }[] = [
   { id: "system", name: "Georgia", css: "Georgia, serif" },
 ];
 
-type Tab = "look" | "writing" | "project" | "data";
+type Tab = "look" | "writing" | "a11y" | "ext" | "project" | "data";
 
 export default function SettingsDialog() {
   const t = useT();
@@ -37,6 +43,8 @@ export default function SettingsDialog() {
   const tabs: [Tab, TKey][] = [
     ["look", "set.tab.look"],
     ["writing", "set.tab.writing"],
+    ["a11y", "a11y.tab"],
+    ["ext", "ext.tab"],
     ["project", "set.tab.project"],
     ["data", "set.tab.data"],
   ];
@@ -170,8 +178,12 @@ export default function SettingsDialog() {
           </>
         )}
 
+        {tab === "a11y" && <A11yTab />}
+        {tab === "ext" && <ExtensionsTab />}
+
         {tab === "project" && m && (
           <>
+            <SagaSection />
             <div className="grid2">
               <label className="field">
                 <span>{t("set.projTitle")}</span>
@@ -252,6 +264,7 @@ export default function SettingsDialog() {
                 </div>
               </>
             )}
+            <UpdatesSection />
             <p className="muted">
               Escribanía v{info?.version} · {t("set.about")}
             </p>
@@ -259,6 +272,179 @@ export default function SettingsDialog() {
         )}
       </div>
     </Modal>
+  );
+}
+
+function SagaSection() {
+  const t = useT();
+  const sagaRel = useStore((st) => st.project?.manifest.saga);
+  const toast = useStore((st) => st.toast);
+  const [info, setInfo] = useState<SagaFile | null>(null);
+  const [name, setName] = useState("");
+  useEffect(() => void sagaInfo().then(setInfo), [sagaRel]);
+  const fail = (e: unknown) => toast(String(e), "error");
+  return (
+    <div className="field saga-box">
+      <span>{t("saga.title")}</span>
+      {sagaRel ? (
+        <>
+          <p>
+            <b>{info?.name ?? sagaRel}</b> · {t("saga.books", { n: info?.books.length ?? 1 })} · {t("saga.entries", { n: info?.codex.length ?? 0 })}
+          </p>
+          {info && <small className="muted">{info.books.map((b) => b.title).join(" · ")}</small>}
+          <small className="muted">{t("saga.how")}</small>
+          <div className="row-wrap">
+            <button className="btn" onClick={() => void pushSaga().then(() => sagaInfo().then(setInfo))}>
+              {t("saga.syncNow")}
+            </button>
+            <button className="btn ghost" onClick={leaveSaga}>
+              {t("saga.leave")}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <small className="muted">{t("saga.hint")}</small>
+          <div className="row-wrap">
+            <input className="input" style={{ maxWidth: 220 }} placeholder={t("saga.namePh")} value={name} onChange={(e) => setName(e.target.value)} />
+            <button
+              className="btn"
+              disabled={!name.trim()}
+              onClick={async () => {
+                const dir = await openDialog({ directory: true, multiple: false, title: t("saga.where") });
+                if (typeof dir !== "string") return;
+                const sep = dir.includes("\\") ? "\\" : "/";
+                await createSaga(`${dir}${sep}${name.trim()}.saga.json`, name.trim()).catch(fail);
+              }}
+            >
+              {t("saga.create")}
+            </button>
+            <button
+              className="btn"
+              onClick={async () => {
+                const path = await openDialog({ multiple: false, filters: [{ name: "Saga", extensions: ["json"] }] });
+                if (typeof path === "string") await joinSaga(path).catch(fail);
+              }}
+            >
+              {t("saga.join")}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function A11yTab() {
+  const t = useT();
+  const s = useStore((st) => st.settings);
+  const set = useStore((st) => st.setSettings);
+  const [capturing, setCapturing] = useState<ShortcutId | null>(null);
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") return setCapturing(null);
+      const combo = e.key === "Backspace" || e.key === "Delete" ? "" : comboOf(e);
+      if (combo === "" && e.key !== "Backspace" && e.key !== "Delete") return;
+      set({ keys: { ...useStore.getState().settings.keys, [capturing]: combo } });
+      setCapturing(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [capturing, set]);
+  const taken = (id: ShortcutId, combo: string) => combo && SHORTCUTS.some((x) => x.id !== id && comboFor(x.id) === combo);
+  return (
+    <>
+      <label className="check">
+        <input id="a11y-dys" type="checkbox" checked={s.dyslexia} onChange={(e) => set({ dyslexia: e.target.checked })} />
+        <span>
+          {t("a11y.dyslexia")}
+          <small className="muted" style={{ display: "block" }}>{t("a11y.dyslexiaHint")}</small>
+        </span>
+      </label>
+      <label className="check">
+        <input id="a11y-contrast" type="checkbox" checked={s.contrast} onChange={(e) => set({ contrast: e.target.checked })} />
+        {t("a11y.contrast")}
+      </label>
+      <label className="check">
+        <input id="a11y-motion" type="checkbox" checked={s.reduceMotion} onChange={(e) => set({ reduceMotion: e.target.checked })} />
+        {t("a11y.motion")}
+      </label>
+      <Range label={t("a11y.scale")} value={s.uiScale} min={0.8} max={1.6} step={0.05} onChange={(v) => set({ uiScale: v })} />
+      <div className="field">
+        <span>{t("a11y.keys")}</span>
+        <div className="keys-table">
+          {SHORTCUTS.map((sc) => {
+            const combo = comboFor(sc.id);
+            return (
+              <div key={sc.id} className="keys-row">
+                <span>{t(`key.${sc.id}` as TKey)}</span>
+                <button className={`kbd ${capturing === sc.id ? "capturing" : ""} ${taken(sc.id, combo) ? "clash" : ""}`} onClick={() => setCapturing(capturing === sc.id ? null : sc.id)}>
+                  {capturing === sc.id ? t("a11y.press") : combo || t("a11y.none")}
+                </button>
+                {s.keys[sc.id] !== undefined && (
+                  <button
+                    className="mini"
+                    title={t("a11y.reset")}
+                    onClick={() => {
+                      const k = { ...s.keys };
+                      delete k[sc.id];
+                      set({ keys: k });
+                    }}
+                  >
+                    <RotateCcw size={13} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <small className="muted">{t("a11y.keysHint")}</small>
+      </div>
+    </>
+  );
+}
+
+function UpdatesSection() {
+  const t = useT();
+  const s = useStore((st) => st.settings);
+  const set = useStore((st) => st.setSettings);
+  const u = useUpdate();
+  if (!u.status) return null;
+  if (!u.status.configured) return <p className="muted">{t("up.notConfigured")}</p>;
+  const last = s.updateChecked ? new Date(s.updateChecked).toLocaleString(s.lang) : "—";
+  return (
+    <div className="field">
+      <span>{t("up.section")}</span>
+      <div className="update-row">
+        <select id="set-updates" className="select" style={{ maxWidth: 260 }} value={s.updates} onChange={(e) => set({ updates: e.target.value as typeof s.updates })}>
+          <option value="stable">{t("up.channel.stable")}</option>
+          <option value="beta">{t("up.channel.beta")}</option>
+          <option value="off">{t("up.channel.off")}</option>
+        </select>
+        <button className="btn" disabled={u.phase === "checking" || u.phase === "downloading"} onClick={() => void checkForUpdate(true)}>
+          {u.phase === "checking" ? t("up.checking") : t("up.checkNow")}
+        </button>
+        {u.status.previous && (
+          <button
+            className="btn"
+            onClick={async () => {
+              if (!(await ask(t("up.rollbackAsk", { v: u.status!.previous! }), { kind: "warning" }))) return;
+              if (useStore.getState().project) await flushAll();
+              await rollback().catch((e) => useStore.getState().toast(String(e)));
+            }}
+          >
+            {t("up.rollback", { v: u.status.previous })}
+          </button>
+        )}
+      </div>
+      <small className="muted">
+        {u.phase === "none" ? t("up.upToDate") + " · " : u.phase === "error" ? u.error + " · " : ""}
+        {t("up.lastCheck", { d: last })}
+      </small>
+    </div>
   );
 }
 

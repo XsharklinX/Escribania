@@ -75,8 +75,18 @@ Cada fase termina con una versión que se puede usar.
 - [x] **Copo de nieve**: asistente en siete pasos que crea fichas de personaje, escenas y una nota con las sinopsis.
 - [x] **Modo guion** (Fountain): reconoce encabezados, personajes, acotaciones, diálogos y transiciones; Tab cambia el tipo; PDF con formato de industria y exportación .fountain.
 
+## 0.8 · Mejoras votadas e instalador propio ✅
+- [x] **Instalador propio** (`installer/`, estilo «Hoja en blanco»): lleva dentro Escribania.exe; instala por usuario en `%LOCALAPPDATA%\Programs\Escribania` sin administrador (accesos, `.escribania`, «Aplicaciones instaladas») o portable; guarda la versión anterior; se copia como `desinstalar.exe` para **desinstalar y reparar** con la misma estética; `/S` silencioso.
+- [x] **Actualizador**: `latest.json` en GitHub Releases, comprobación diaria (canal estable o beta), descarga en segundo plano, **SHA-256 + firma ed25519** (`tools/firma`, clave pública en `src-tauri/firma.pub`), ventana «Fe de erratas» con *Reiniciar y actualizar / Al cerrar / Más tarde*, aviso discreto en la barra (sin ventanas durante Retiro o un sprint), vuelta atrás manual y automática si la nueva no arranca. El repositorio se configura en `src-tauri/actualizaciones.json`.
+- [x] Escribir: **variantes de escena**, **escritura sin red**, **sinónimos y antónimos** (tesauros de LibreOffice), **frase de arranque**, **ambientes** tren/bosque/biblioteca/teclas, **accesibilidad** (OpenDyslexic, alto contraste, escala, menos animación, atajos configurables).
+- [x] Revisar: **Repaso** con pendientes, **continuidad**, **voces** y **lectores beta** (HTML para comentar + importación a Marginalia); **Máquina del tiempo**; **copia para leer en papel**.
+- [x] Organizar: **calendario editorial**, **etiquetas y colecciones**, **corcho libre**, **paneles en otra ventana**, **proyecto de ejemplo y recorrido**, **series y sagas**.
+- [x] Publicar: **inicial capitular real**, **vista de pliegos**, **exportar para la web**, **estilos de imprenta propios**.
+- [x] Cimientos: **sincronía por carpeta** (candado, cambios externos, copias en conflicto) y **extensiones y temas** (Worker aislado, galería incluida).
+- Textos nuevos solo en español por ahora: el inglés se completará de una vez.
+
 ## F8 · Ecosistema y 1.0
-- Extensiones y temas · Sincronía por carpeta · Dictado local · Linux probado de verdad · publicación 1.0
+- Dictado local · Linux probado de verdad · traducción al inglés de la 0.8 · publicación 1.0
 
 ## Fuera del plan
 Generador de nombres · Musa (IA)

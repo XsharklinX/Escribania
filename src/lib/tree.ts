@@ -114,6 +114,7 @@ export function filesIn(list: TreeNode[]): string[] {
   const out: string[] = [];
   walk(list, (n) => {
     if (n.file) out.push(n.file);
+    for (const v of n.variants ?? []) out.push(v.file);
   });
   return out;
 }

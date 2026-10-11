@@ -51,6 +51,21 @@ export interface TreeNode {
   place?: string;
   /** Modo guion (Fountain) en este texto. */
   screenplay?: boolean;
+  /** Variantes de la escena: la activa vive en `file`; el resto, en sus archivos. */
+  variants?: Variant[];
+  variantActive?: string;
+  /** Etiquetas libres (flashback, por revisar…). */
+  tags?: string[];
+  /** Corcho libre: posición de la ficha. */
+  cork?: { x: number; y: number; color?: string };
+}
+
+export interface Variant {
+  id: string;
+  name: string;
+  /** Copia guardada ("texto/variantes/la-carta-k3f9~b.md"); la activa está desfasada hasta que se cambia. */
+  file: string;
+  words?: number;
 }
 
 export interface Plotline {
@@ -183,6 +198,8 @@ export interface CodexEntry {
   mentions: boolean;
   /** Posición en la Telaraña. */
   pos?: { x: number; y: number };
+  /** Compartida con los demás libros de la saga. */
+  shared?: boolean;
 }
 
 export interface Relation {
@@ -257,6 +274,33 @@ export interface Manifest {
   calendar: Calendar;
   maps: MapDef[];
   snowflake: Snowflake;
+  /** Calendario editorial: entregas, revisiones, lectores… */
+  agenda: AgendaItem[];
+  /** Colecciones del Legajo: a mano o búsquedas guardadas. */
+  collections: Collection[];
+  /** Corcho libre: flechas entre fichas. */
+  corkLinks: { id: string; from: string; to: string }[];
+  /** Saga a la que pertenece el libro (ruta relativa a su archivo `.saga.json`). */
+  saga?: string;
+}
+
+export interface AgendaItem {
+  id: string;
+  date: string;
+  title: string;
+  kind: "deadline" | "revision" | "beta" | "submission" | "other";
+  done: boolean;
+  note?: string;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  color: string;
+  /** "manual": ids elegidos; "smart": se recalcula con el filtro. */
+  kind: "manual" | "smart";
+  ids: string[];
+  filter: { tags: string[]; status: Status[]; pov: string; text: string };
 }
 
 export interface Recent {
@@ -266,7 +310,8 @@ export interface Recent {
 }
 
 export interface Settings {
-  theme: ThemeId;
+  /** Uno de los cuatro temas o "custom:<id>" (tema propio). */
+  theme: ThemeId | `custom:${string}`;
   lang: Lang;
   font: FontId;
   fontSize: number;
@@ -296,6 +341,24 @@ export interface Settings {
   ttsVoice: string;
   ttsRate: number;
   contact: { legalName: string; address: string; email: string; phone: string };
+  /** Canal de actualizaciones; se comprueba una vez al día. */
+  updates: "stable" | "beta" | "off";
+  updateChecked: string;
+  /** Notas de la edición recién instalada, para enseñarlas una vez al arrancar. */
+  updateNotes: { version: string; notes: Record<string, ReleaseNotes> } | null;
+  /** Accesibilidad. */
+  dyslexia: boolean;
+  contrast: boolean;
+  uiScale: number;
+  reduceMotion: boolean;
+  /** Atajos cambiados por el usuario (id → combinación; "" = sin atajo). */
+  keys: Record<string, string>;
+}
+
+export interface ReleaseNotes {
+  nuevo: string[];
+  mejorado: string[];
+  corregido: string[];
 }
 
 export interface AppInfo {
@@ -304,6 +367,7 @@ export interface AppInfo {
   data_dir: string;
   backups_dir: string;
   startup_file: string | null;
+  flags: string[];
 }
 
 export interface Opened {
@@ -330,4 +394,6 @@ export type View =
   | "mural"
   | "pulso"
   | "imprenta"
-  | "termometro";
+  | "termometro"
+  | "repaso"
+  | "calendario";

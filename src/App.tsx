@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { DEFAULT_SETTINGS, useStore } from "./store";
 import type { Settings } from "./types";
 import { api } from "./lib/api";
@@ -10,6 +11,13 @@ import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import Welcome from "./components/Welcome";
 import Workspace from "./components/Workspace";
 import Toasts from "./components/Toasts";
+import UpdateDialog from "./components/UpdateDialog";
+import { applyOnCloseIfPending, initUpdater } from "./lib/updater";
+import { broadcastManifest } from "./lib/panels";
+import { openSample } from "./lib/sample";
+import { stopSync } from "./lib/sync";
+import { applyCustomTheme, initThemes, useThemes } from "./lib/themes";
+import { startPlugins } from "./lib/plugins";
 
 const FONTS: Record<Settings["font"], string> = {
   literata: '"Literata", Georgia, serif',
@@ -22,6 +30,7 @@ export default function App() {
   const project = useStore((s) => s.project);
   const settings = useStore((s) => s.settings);
   const loaded = useStore((s) => s.settingsLoaded);
+  const customThemes = useThemes((s) => s.themes);
 
   // Arranque: ajustes, datos de la app y proyecto abierto con doble clic.
   useEffect(() => {
@@ -30,6 +39,11 @@ export default function App() {
       const merged = { ...DEFAULT_SETTINGS, ...(saved && typeof saved === "object" ? (saved as Partial<Settings>) : {}) };
       useStore.setState({ info, settings: merged, settingsLoaded: true });
       if (info?.startup_file) await openProject(info.startup_file);
+      else if (info?.flags?.includes("--ejemplo")) await openSample().catch(() => false);
+      if (info?.flags?.includes("--recorrido") && useStore.getState().project) useStore.setState({ tour: 0 });
+      void initUpdater();
+      void initThemes();
+      void startPlugins();
     })();
   }, []);
 
@@ -43,13 +57,27 @@ export default function App() {
   // Tema, tipografía y medidas de la hoja.
   useEffect(() => {
     const r = document.documentElement;
-    r.dataset.theme = settings.theme;
+    const custom = settings.theme.startsWith("custom:") ? customThemes.find((x) => `custom:${x.id}` === settings.theme) ?? null : null;
+    r.dataset.theme = custom ? (custom.dark ? "tinta" : "algodon") : settings.theme.startsWith("custom:") ? "algodon" : settings.theme;
+    applyCustomTheme(custom);
     r.lang = settings.lang;
-    r.style.setProperty("--editor-font", FONTS[settings.font]);
+    r.style.setProperty("--editor-font", settings.dyslexia ? '"OpenDyslexic", sans-serif' : FONTS[settings.font]);
     r.style.setProperty("--editor-size", `${settings.fontSize}px`);
     r.style.setProperty("--editor-lh", String(settings.lineHeight));
     r.style.setProperty("--line-width", `${settings.lineWidth}px`);
-  }, [settings.theme, settings.lang, settings.font, settings.fontSize, settings.lineHeight, settings.lineWidth]);
+  }, [settings.theme, settings.lang, settings.font, settings.fontSize, settings.lineHeight, settings.lineWidth, settings.dyslexia, customThemes]);
+
+  // Accesibilidad: letra para dislexia, alto contraste, menos movimiento y tamaño de la interfaz.
+  useEffect(() => {
+    const r = document.documentElement;
+    r.dataset.dyslexia = settings.dyslexia ? "on" : "";
+    r.dataset.contrast = settings.contrast ? "high" : "";
+    r.dataset.motion = settings.reduceMotion ? "reduce" : "";
+  }, [settings.dyslexia, settings.contrast, settings.reduceMotion]);
+  useEffect(() => {
+    if (!loaded) return;
+    void getCurrentWebview().setZoom(settings.uiScale || 1).catch(() => {});
+  }, [settings.uiScale, loaded]);
 
   // Al cerrar la ventana: guardar todo y hacer copia antes de salir.
   useEffect(() => {
@@ -59,9 +87,17 @@ export default function App() {
         await saveJournal();
         await backupNow();
       }
+      stopSync();
+      await applyOnCloseIfPending();
     });
     return () => void un.then((f) => f());
   }, []);
+
+  // Paneles en otra ventana: se les avisa de cada cambio del proyecto.
+  const manifest = useStore((s) => s.project?.manifest);
+  useEffect(() => {
+    if (manifest) broadcastManifest(manifest);
+  }, [manifest]);
 
   // Cuaderno de ideas: atajo global para apuntar algo aunque la ventana esté minimizada.
   const quick = settings.quickCapture;
@@ -84,6 +120,7 @@ export default function App() {
     <>
       {project ? <Workspace /> : <Welcome />}
       <Toasts />
+      <UpdateDialog />
     </>
   );
 }

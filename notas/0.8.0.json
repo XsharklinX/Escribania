@@ -1,0 +1,23 @@
+{
+  "es": {
+    "nuevo": [
+      "Instalador propio «Hoja en blanco»: para tu usuario, sin pedir administrador, o portable en un USB. Desinstala y repara con la misma ventana.",
+      "Actualizaciones: una vez al día busca ediciones nuevas, las descarga y comprueba su firma; tú eliges cuándo instalar. Se puede volver a la anterior.",
+      "Variantes de una escena: escribe varias versiones, compáralas lado a lado y elige la que entra en el libro.",
+      "Máquina del tiempo: cualquier texto tal como estaba cualquier día, con sus capas y copias; restaura un párrafo o la versión entera.",
+      "Repaso: pendientes (TODO, REVISAR…), continuidad (nombres, ojos, edades), voz de cada personaje y edición para lectores beta.",
+      "Calendario editorial, etiquetas y colecciones, corcho libre con flechas, series y sagas con Códice compartido.",
+      "Paneles en otra ventana, proyecto de ejemplo «La casa del faro» y recorrido de dos minutos.",
+      "Imprenta: inicial capitular de verdad, vista de pliegos, copia para leer en papel, estilos propios y exportación para la web.",
+      "Sinónimos y antónimos sin conexión, cuatro ambientes nuevos en Retiro, escritura sin red y frase de arranque.",
+      "Accesibilidad (letra para dislexia, alto contraste, tamaño de interfaz, atajos configurables), temas propios y extensiones.",
+      "Sincronía por carpeta: aviso si el proyecto está abierto en otro equipo, cambios cruzados y copias en conflicto de la nube."
+    ],
+    "mejorado": [
+      "Los pendientes y comentarios nunca salen al exportar."
+    ],
+    "corregido": [
+      "Los menús Planificar y Mundo no se abrían."
+    ]
+  }
+}

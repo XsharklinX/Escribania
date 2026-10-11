@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { diffWords } from "diff";
+import { TagsField } from "./Collections";
 import { Glasses, Layers, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useStore } from "../store";
 import type { TreeNode } from "../types";
@@ -117,6 +118,8 @@ function Card({ node, section }: { node: TreeNode; section: string }) {
         <span>{t("insp.synopsis")}</span>
         <textarea id="insp-synopsis" className="textarea" rows={4} value={node.synopsis} placeholder={t("insp.synopsisPh")} onChange={(e) => set({ synopsis: e.target.value })} />
       </label>
+
+      {(node.type === "text" || node.type === "folder") && <TagsField id={node.id} tags={node.tags ?? []} />}
 
       {node.type === "text" && (
         <div className="field">

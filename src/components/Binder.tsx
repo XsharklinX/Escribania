@@ -41,6 +41,7 @@ import {
 } from "../lib/tree";
 import { formatNumber } from "../lib/words";
 import Modal from "./Modal";
+import { CollectionList, CollectionsBar } from "./Collections";
 
 export const STATUSES: Status[] = ["idea", "draft", "revised", "final"];
 
@@ -128,6 +129,7 @@ export default function Binder() {
   const words = useStore((s) => s.words);
   const lang = useStore((s) => s.settings.lang);
   const selected = useStore((s) => s.selected);
+  const collection = useStore((s) => s.collection);
   const [drop, setDrop] = useState<Drop>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [webOpen, setWebOpen] = useState(false);
@@ -169,8 +171,10 @@ export default function Binder() {
 
   return (
     <aside className="binder" onClick={() => setMenu(null)}>
+      <CollectionsBar dragId={dragId} />
       <div className="binder-scroll" ref={scrollRef} tabIndex={0} onKeyDown={onKeyDown}>
-        {SECTIONS.map((sec) => {
+        {collection && <CollectionList />}
+        {!collection && SECTIONS.map((sec) => {
           const Icon = SECTION_ICON[sec];
           const list = m.sections[sec];
           const total = sec === "manuscript" ? bookWords(m, words) : list.reduce((s, n) => s + wordsOf(n, words), 0);

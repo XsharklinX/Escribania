@@ -3,7 +3,7 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Check, ExternalLink, FilePlus2, FileText, Folder, MessageSquarePlus, RotateCcw, Trash2, X } from "lucide-react";
+import { AppWindow, Check, ExternalLink, FilePlus2, FileText, Folder, MessageSquarePlus, RotateCcw, Trash2, X } from "lucide-react";
 import { useStore } from "../store";
 import type { Comment, TreeNode } from "../types";
 import { tNow, useT } from "../lib/i18n";
@@ -35,6 +35,13 @@ import { SpellCheck, spellKey } from "../lib/spell";
 import { DEFAULT_CRUTCHES, StyleLens, lensKey, useLens } from "../lib/style";
 import { ReadAloud, stopReading, useTts } from "../lib/tts";
 import { Screenplay } from "../lib/screenplay";
+import { NoNet, STARTERS } from "../lib/nonet";
+import { TodoHighlight } from "../lib/todos";
+import { keySound } from "../lib/ambient";
+import { loadIdeas } from "./Notebook";
+import { matches } from "../lib/shortcuts";
+import { setActiveEditor } from "../lib/activeEditor";
+import { openPanel } from "../lib/panels";
 import EditorBar from "./EditorBar";
 import SpellMenu from "./SpellMenu";
 
@@ -119,7 +126,7 @@ function SceneEditor({ node, root, areaRef, side }: { node: TreeNode; root: stri
     const p = useStore.getState().project;
     return p ? locate(p.manifest, node.id)?.node : undefined;
   };
-  const [spellMenu, setSpellMenu] = useState<{ x: number; y: number; word: string; from: number; to: number } | null>(null);
+  const [spellMenu, setSpellMenu] = useState<{ x: number; y: number; word: string; from: number; to: number; misspelled: boolean } | null>(null);
   const typewriterRef = useRef(typewriter);
   typewriterRef.current = typewriter;
 
@@ -178,11 +185,14 @@ function SceneEditor({ node, root, areaRef, side }: { node: TreeNode; root: stri
       }),
       ReadAloud,
       Screenplay.configure({ isOn: () => Boolean(currentNode()?.screenplay) }),
+      TodoHighlight,
+      NoNet.configure({ isOn: () => useStore.getState().retiro && useStore.getState().noNet }),
     ],
     editable: false,
     editorProps: {
       attributes: { spellcheck: useStore.getState().settings.spell === "system" ? "true" : "false", lang: useStore.getState().settings.lang },
       handleKeyDown: (_view, event) => {
+        if (useStore.getState().retiro) keySound(event.key);
         const sp = useStore.getState().sprint;
         if (sp?.brave && !sp.finished && (event.key === "Backspace" || event.key === "Delete")) {
           if (Date.now() - braveToast > 4000) {
@@ -191,8 +201,17 @@ function SceneEditor({ node, root, areaRef, side }: { node: TreeNode; root: stri
           }
           return true;
         }
-        if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "m") {
+        if (matches(event, "comment")) {
           addComment();
+          return true;
+        }
+        if (matches(event, "todo") && editor) {
+          const sel = editor.state.selection;
+          editor.chain().focus().insertContentAt(sel.to, "[TODO: ]").setTextSelection(sel.to + 7).run();
+          return true;
+        }
+        if (matches(event, "thesaurus") && editor) {
+          openThesaurus(editor.state.selection.from);
           return true;
         }
         return false;
@@ -294,7 +313,26 @@ function SceneEditor({ node, root, areaRef, side }: { node: TreeNode; root: stri
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(lensKey, true).setMeta(spellKey, true));
   }, [pluginSig, lensKinds, editor]);
   useEffect(() => () => stopReading(), []);
+  useEffect(() => {
+    if (side || !editor) return;
+    setActiveEditor(editor);
+    return () => setActiveEditor(null);
+  }, [editor, side]);
   const screenplay = useStore((s) => Boolean(locate(s.project!.manifest, node.id)?.node.screenplay));
+
+  // ---------- Sinónimos ----------
+  const openThesaurus = (pos: number, x?: number, y?: number) => {
+    if (!editor) return;
+    const w = wordAt(editor, pos);
+    if (!w) return;
+    let px = x, py = y;
+    if (px === undefined || py === undefined) {
+      const c = editor.view.coordsAtPos(w.from);
+      px = c.left;
+      py = c.bottom + 4;
+    }
+    setSpellMenu({ x: px, y: py, ...w, misspelled: false });
+  };
 
   // ---------- Marginalia ----------
   const comments = useStore((s) => locate(s.project!.manifest, node.id)?.node.comments ?? NO_COMMENTS);
@@ -401,12 +439,21 @@ function SceneEditor({ node, root, areaRef, side }: { node: TreeNode; root: stri
       <div
         className={`sheet ${screenplay ? "screenplay" : ""}`}
         onContextMenu={(e) => {
+          if (!editor) return;
           const el = (e.target as HTMLElement).closest(".spell-error") as HTMLElement | null;
-          if (!el || !editor) return;
+          if (el) {
+            e.preventDefault();
+            const from = editor.view.posAtDOM(el, 0);
+            const word = el.dataset.word ?? el.textContent ?? "";
+            setSpellMenu({ x: e.clientX, y: e.clientY, word, from, to: from + word.length, misspelled: true });
+            return;
+          }
+          // Cualquier otra palabra: sinónimos (sin tocar el menú si hay texto seleccionado).
+          if (!editor.state.selection.empty) return;
+          const at = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+          if (!at || !wordAt(editor, at.pos)) return;
           e.preventDefault();
-          const from = editor.view.posAtDOM(el, 0);
-          const word = el.dataset.word ?? el.textContent ?? "";
-          setSpellMenu({ x: e.clientX, y: e.clientY, word, from, to: from + word.length });
+          openThesaurus(at.pos, e.clientX, e.clientY);
         }}
         ref={sheetRef}
         onMouseDown={(e) => {
@@ -420,6 +467,7 @@ function SceneEditor({ node, root, areaRef, side }: { node: TreeNode; root: stri
         onClick={onClick}
       >
         <div className="scene-title">{node.title}</div>
+        {!side && <Starter editor={editor} />}
         <EditorContent editor={editor} />
         {bubble && (
           <button className="comment-bubble" style={{ top: bubble.top, left: bubble.left }} onMouseDown={(e) => e.preventDefault()} onClick={addComment}>
@@ -477,6 +525,74 @@ function SceneEditor({ node, root, areaRef, side }: { node: TreeNode; root: stri
   );
 }
 
+/** Frase de arranque: en Retiro, un texto vacío propone por dónde empezar. */
+function Starter({ editor }: { editor: Editor | null }) {
+  const t = useT();
+  const retiro = useStore((s) => s.retiro);
+  const lang = useStore((s) => s.settings.lang);
+  const [pool, setPool] = useState<string[] | null>(null);
+  const [i, setI] = useState(0);
+  const [hidden, setHidden] = useState(false);
+  const [empty, setEmpty] = useState(false);
+  useEffect(() => {
+    if (!editor) return;
+    const check = () => setEmpty(editor.isEditable && editor.isEmpty);
+    check();
+    editor.on("update", check);
+    editor.on("transaction", check);
+    return () => {
+      editor.off("update", check);
+      editor.off("transaction", check);
+    };
+  }, [editor]);
+  useEffect(() => {
+    if (!retiro || pool) return;
+    void loadIdeas().then((ideas) => {
+      const mine = ideas.map((x) => x.text.trim()).filter((x) => x && x.length < 400);
+      const list = mine.length ? mine : STARTERS[lang];
+      setPool(list);
+      setI(Math.floor(Math.random() * list.length));
+    });
+  }, [retiro, pool, lang]);
+  if (!retiro || !empty || hidden || !pool?.length || !editor) return null;
+  const phrase = pool[i % pool.length];
+  return (
+    <div className="starter">
+      <span className="lbl">{t("starter.title")}</span>
+      <p>{phrase}</p>
+      <div className="row">
+        <button className="btn" onClick={() => setI((n) => n + 1 + Math.floor(Math.random() * Math.max(1, pool.length - 1)))}>
+          {t("starter.other")}
+        </button>
+        <button className="btn primary" onClick={() => editor.chain().focus().insertContent(`<p>${phrase.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p><p></p>`).run()}>
+          {t("starter.use")}
+        </button>
+        <button className="btn ghost" onClick={() => setHidden(true)}>
+          {t("starter.hide")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** La palabra que hay en una posición del editor, con sus límites. */
+export function wordAt(editor: Editor, pos: number): { word: string; from: number; to: number } | null {
+  const $pos = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size));
+  if (!$pos.parent.isTextblock) return null;
+  // Los nodos hoja cuentan 1 en las posiciones: se sustituyen por un carácter para que cuadren.
+  const text = $pos.parent.textBetween(0, $pos.parent.content.size, undefined, "\uFFFC");
+  const isWord = (ch: string | undefined) => !!ch && /[\p{L}\p{M}'’-]/u.test(ch);
+  let a = $pos.parentOffset;
+  let b = $pos.parentOffset;
+  while (a > 0 && isWord(text[a - 1])) a--;
+  while (b < text.length && isWord(text[b])) b++;
+  const word = text.slice(a, b).replace(/^['’-]+|['’-]+$/g, "");
+  if (word.length < 2) return null;
+  const lead = text.slice(a, b).indexOf(word);
+  const from = $pos.start() + a + lead;
+  return { word, from, to: from + word.length };
+}
+
 function MentionCard({ id, style }: { id: string; style: React.CSSProperties }) {
   const t = useT();
   const entry = useStore((s) => codexById(s.project!.manifest, id));
@@ -503,7 +619,7 @@ function MentionCard({ id, style }: { id: string; style: React.CSSProperties }) 
   );
 }
 
-function ResearchViewer({ node }: { node: TreeNode }) {
+export function ResearchViewer({ node }: { node: TreeNode }) {
   const t = useT();
   const root = useStore((s) => s.project!.root);
   const isHtml = node.mime === "text/html";
@@ -522,6 +638,9 @@ function ResearchViewer({ node }: { node: TreeNode }) {
       <div className="research-head">
         <Icon size={16} className="muted" />
         <b>{node.title}</b>
+        <button className="icon-btn" title={t("panel.open")} onClick={() => void openPanel("research", node.id, node.title)}>
+          <AppWindow size={15} />
+        </button>
         {node.url && (
           <button className="btn" onClick={() => void openUrl(node.url!).catch(() => {})}>
             <ExternalLink size={14} /> {t("res.openBrowser")}

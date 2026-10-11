@@ -1,7 +1,13 @@
+import { Puzzle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookUser, Command, FileText, LayoutGrid } from "lucide-react";
 import { useStore } from "../store";
-import { useT, type TKey } from "../lib/i18n";
+import { openSample } from "../lib/sample";
+import { runCommand, usePlugins } from "../lib/plugins";
+import { activeEditor } from "../lib/activeEditor";
+import { locate } from "../lib/tree";
+import { markdownToHtml } from "../lib/markdown";
+import { tNow, useT, type TKey } from "../lib/i18n";
 import { SECTIONS, walk } from "../lib/tree";
 import { backupNow, flushAll } from "../lib/saver";
 import { closeProject } from "../lib/projects";
@@ -16,6 +22,24 @@ interface Item {
   group: "cmd" | "node" | "codex" | "board";
   icon?: React.ComponentType<{ size?: number }>;
   run: () => void;
+}
+
+/** Ejecuta una orden de extensión sobre la escena abierta. */
+async function runExtension(pluginId: string, command: string) {
+  const st = useStore.getState();
+  const ed = activeEditor();
+  if (!ed) return st.toast(tNow("ext.needScene"), "error");
+  const { from, to } = ed.state.selection;
+  const title = st.selected && st.project ? locate(st.project.manifest, st.selected)?.node.title ?? "" : "";
+  try {
+    const r = await runCommand(pluginId, command, { title, text: ed.getText({ blockSeparator: "\n\n" }), selection: ed.state.doc.textBetween(from, to, "\n") });
+    // Cada línea del resultado es un párrafo.
+    if (r.replace !== undefined) ed.commands.setContent(markdownToHtml(r.replace.replace(/\n+/g, "\n\n")));
+    if (r.insert !== undefined) ed.chain().focus().insertContentAt(ed.state.selection.to, r.insert).run();
+    if (r.message) st.toast(r.message);
+  } catch (e) {
+    st.toast(`${command}: ${String(e instanceof Error ? e.message : e)}`, "error");
+  }
 }
 
 export function normalize(s: string) {
@@ -43,6 +67,7 @@ export default function CommandPalette() {
   const [idx, setIdx] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const close = () => useStore.setState({ palette: false });
+  const running = usePlugins((s) => s.running);
 
   const items = useMemo(() => {
     const st = () => useStore.getState();
@@ -73,6 +98,9 @@ export default function CommandPalette() {
         useStore.setState({ view: "codice" });
       }),
       cmd("save", "pal.save", () => void flushAll(), "Ctrl+S"),
+      cmd("tour", "pal.tour", () => useStore.setState({ tour: 0, view: "hoja" })),
+      cmd("sample", "pal.sample", () => void openSample()),
+      cmd("time-machine", "tm.title", () => st().selected && useStore.setState({ timeMachine: st().selected })),
       cmd("backup", "set.backupNow", () => void backupNow(true).then((p) => p && st().toast(t("set.backupDone")))),
       cmd("close", "tb.close", () => void closeProject()),
       ...VIEWS.map((v) => cmd("view-" + v.id, v.key, () => useStore.setState({ view: v.id }), t("pal.view"))),
@@ -93,8 +121,10 @@ export default function CommandPalette() {
     for (const e of m.codex)
       out.push({ id: "c" + e.id, label: e.name, hint: [t(`kind.${e.kind}`), ...e.aliases].join(" · "), group: "codex", icon: BookUser, run: () => useStore.setState({ view: "codice", codexSelected: e.id }) });
     for (const b of m.boards) out.push({ id: "b" + b.id, label: b.name, hint: t("view.mural"), group: "board", icon: LayoutGrid, run: () => useStore.setState({ view: "mural" }) });
+    for (const r of running)
+      for (const c of r.commands) out.push({ id: `x-${r.plugin.id}-${c}`, label: c, hint: r.plugin.name, group: "cmd", icon: Puzzle, run: () => void runExtension(r.plugin.id, c) });
     return out;
-  }, [m, t]);
+  }, [m, t, running]);
 
   const results = useMemo(() => {
     if (!q.trim()) return items.filter((i) => i.group === "cmd").slice(0, 12);

@@ -7,6 +7,8 @@
  */
 import { useStore } from "../store";
 import { api, errorText } from "./api";
+import { broadcastText } from "./panels";
+import { schedulePush } from "./saga";
 import { tNow } from "./i18n";
 
 interface PendingText {
@@ -24,6 +26,18 @@ let manifestDirty = false;
 let inFlight: Promise<void> = Promise.resolve();
 let changedSinceBackup = false;
 let backupTimer: ReturnType<typeof setInterval> | null = null;
+export function hasPendingText(file: string): boolean {
+  return pendingTexts.has(file);
+}
+
+export function dropPendingText(file: string) {
+  pendingTexts.delete(file);
+  refreshState();
+}
+
+export function isManifestDirty(): boolean {
+  return manifestDirty;
+}
 
 function setState(s: "saved" | "pending" | "saving" | "error") {
   if (useStore.getState().saveState !== s) useStore.setState({ saveState: s });
@@ -66,6 +80,8 @@ export function flushTexts(): Promise<void> {
     for (const t of batch) {
       try {
         await api.textWrite(t.root, t.file, t.id, t.title, t.body);
+        broadcastText(t.file);
+        if (useStore.getState().project?.manifest.codex.some((e) => e.shared && e.file === t.file)) schedulePush();
       } catch (e) {
         // Se vuelve a poner en cola para no perder el texto.
         if (!pendingTexts.has(t.file)) pendingTexts.set(t.file, t);
@@ -89,6 +105,7 @@ export function flushManifest(): Promise<void> {
     setState("saving");
     try {
       await api.projectSave(p.path, p.manifest);
+      if (p.manifest.saga) schedulePush();
       refreshState();
     } catch (e) {
       manifestDirty = true;

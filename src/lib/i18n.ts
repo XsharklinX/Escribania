@@ -2,6 +2,7 @@ import { useStore } from "../store";
 import type { Lang } from "../types";
 import { en2, es2, type Key2 } from "./strings";
 import { en3, es3, type Key3 } from "./strings3";
+import { en4, es4, type Key4 } from "./strings4";
 
 const es = {
   "app.tagline": "Escribe, estructura y termina tu libro.",
@@ -333,9 +334,9 @@ const en: Record<Key1, string> = {
   "words.unit": "w.",
 };
 
-type Key = Key1 | Key2 | Key3;
+type Key = Key1 | Key2 | Key3 | Key4;
 
-const DICTS: Record<Lang, Record<Key, string>> = { es: { ...es, ...es2, ...es3 }, en: { ...en, ...en2, ...en3 } };
+const DICTS: Record<Lang, Partial<Record<Key, string>>> = { es: { ...es, ...es2, ...es3, ...es4 }, en: { ...en, ...en2, ...en3, ...en4 } };
 
 export type TKey = Key;
 

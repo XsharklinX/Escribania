@@ -4,6 +4,7 @@
  */
 import type { Paragraph as DocxParagraph } from "docx";
 import type { CompileOptions, Manifest, TreeNode } from "../types";
+import { stripTodos } from "./todos";
 import { acceptChanges, escapeInline, markdownToHtml, markdownToPlain, markdownTokens, stripComments } from "./markdown";
 
 export type Piece =
@@ -35,7 +36,8 @@ export async function collectPieces(
       } else if (n.type === "text" && n.file) {
         // Los comentarios de Marginalia nunca salen en el libro y los cambios se aceptan.
         const raw = (await read(n.file)).trim();
-        const md = keepReview ? raw : acceptChanges(stripComments(raw)).trim();
+        // Los pendientes (TODO, REVISAR…) son notas del autor: tampoco salen.
+        const md = keepReview ? raw : stripTodos(acceptChanges(stripComments(raw))).trim();
         if (opts.textTitles) {
           pieces.push({ kind: "heading", level: Math.min(depth + 1, 3), text: n.title, chapterStart: !opts.folderTitles || depth === 0 });
         } else if (prevText && opts.separator.trim()) {

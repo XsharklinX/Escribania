@@ -1,0 +1,3 @@
+Diccionarios de sinónimos de LibreOffice, convertidos con scripts/tesauro.py.
+es: OpenThesaurus en español (Marcelo Garrone), LGPL 2.1.
+en: WordNet 3.0 (Princeton University), licencia WordNet: https://wordnet.princeton.edu/license-and-commercial-use

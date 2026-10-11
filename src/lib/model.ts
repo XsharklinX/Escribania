@@ -77,6 +77,9 @@ export function normalizeManifest(m: Manifest): Manifest {
   m.events = m.events ?? [];
   m.calendar = { kind: "real", start: new Date().toISOString().slice(0, 10), months: [], yearName: "año", firstYear: 1, ...((m.calendar ?? {}) as Partial<Calendar>) };
   m.maps = m.maps ?? [];
+  m.agenda = m.agenda ?? [];
+  m.collections = m.collections ?? [];
+  m.corkLinks = m.corkLinks ?? [];
   m.snowflake = { step: 0, sentence: "", paragraph: "", characters: [], page: "", synopsis: "", scenes: [], ...((m.snowflake ?? {}) as Partial<Snowflake>) };
   m.compile = {
     titlePage: true,
