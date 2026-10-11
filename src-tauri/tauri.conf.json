@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Escribanía",
+  "mainBinaryName": "Escribania",
+  "version": "0.7.0",
+  "identifier": "com.escribania.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1430",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Escribanía",
+        "width": 1360,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "backgroundColor": "#E6E8EC",
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src 'self' data: blob:; object-src 'self' data: blob:; font-src 'self' data:; script-src 'self'; media-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "David Bonilla",
+    "copyright": "© 2026 David Bonilla · GPL-3.0",
+    "license": "GPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
+    "shortDescription": "Software libre para escritores",
+    "longDescription": "Escribanía: escribe, estructura y publica tu libro. Libre, sin conexión y con archivos abiertos.",
+    "category": "Productivity",
+    "fileAssociations": [
+      {
+        "ext": ["escribania"],
+        "name": "Proyecto de Escribanía",
+        "description": "Proyecto de Escribanía",
+        "role": "Editor",
+        "mimeType": "application/x-escribania"
+      }
+    ]
+  }
+}
